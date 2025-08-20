@@ -1,0 +1,315 @@
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { ArrowLeft, Plus, Package, ImageIcon, Lock } from 'lucide-react';
+import { useProducts } from '@/contexts/SupabaseProductContext';
+import { useAdmin } from '@/contexts/AdminContext';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import Layout from '@/components/Layout';
+import EnhancedCashierDialog from '@/components/EnhancedCashierDialog';
+import { cn } from '@/lib/utils';
+
+const AddProduct: React.FC = () => {
+  const navigate = useNavigate();
+  const { addProduct, categories } = useProducts();
+  const { isAdminMode, adminSettings } = useAdmin();
+  
+  const [formData, setFormData] = useState({
+    name: '',
+    price: '',
+    quantity: '',
+    category: '',
+    description: ''
+  });
+  
+  const [loading, setLoading] = useState(false);
+  const [selectedImage, setSelectedImage] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [showCashierDialog, setShowCashierDialog] = useState(false);
+
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!formData.name || !formData.price || !formData.quantity || !formData.category) {
+      return;
+    }
+
+    // If cashier dialog is disabled, add product directly
+    if (adminSettings?.disableCashierDialog) {
+      await handleDirectProductAdd();
+      return;
+    }
+
+    setShowCashierDialog(true);
+  };
+
+  const handleDirectProductAdd = async () => {
+    setLoading(true);
+    
+    try {
+      // Convert image to base64 if selected
+      let imageUrl = undefined;
+      if (selectedImage) {
+        imageUrl = await convertToBase64(selectedImage);
+      }
+
+      await addProduct({
+        name: formData.name,
+        price: parseFloat(formData.price),
+        quantity: parseInt(formData.quantity),
+        category: formData.category,
+        imageUrl
+      }, 'admin'); // Use 'admin' as default cashier name when dialog is disabled
+      
+      navigate('/');
+    } catch (error) {
+      console.error('Error adding product:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCashierConfirm = async (cashierName: string) => {
+    setLoading(true);
+    
+    try {
+      // Convert image to base64 if selected
+      let imageUrl = undefined;
+      if (selectedImage) {
+        imageUrl = await convertToBase64(selectedImage);
+      }
+
+      await addProduct({
+        name: formData.name,
+        price: parseFloat(formData.price),
+        quantity: parseInt(formData.quantity),
+        category: formData.category,
+        imageUrl
+      }, cashierName);
+      
+      setShowCashierDialog(false);
+      navigate('/');
+    } catch (error) {
+      console.error('Error adding product:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleInputChange = (field: string, value: string) => {
+    setFormData(prev => ({ ...prev, [field]: value }));
+  };
+
+  const convertToBase64 = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = error => reject(error);
+    });
+  };
+
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setSelectedImage(file);
+      const previewUrl = URL.createObjectURL(file);
+      setImagePreview(previewUrl);
+    }
+  };
+
+  // Show access denied message if admin is required but user is not admin
+  const showAccessDenied = adminSettings?.requireAdminForProductActions && !isAdminMode;
+
+  return (
+    <Layout>
+      <div className="container mx-auto px-4 py-6 max-w-2xl">
+        {/* Header */}
+        <div className="flex items-center space-x-4 mb-6">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => navigate('/')}
+            className="rounded-full"
+          >
+            <ArrowLeft className="w-5 h-5" />
+          </Button>
+          <div>
+            <h1 className="text-2xl font-bold text-foreground">Add Product</h1>
+            <p className="text-muted-foreground">Add a new product to your inventory</p>
+          </div>
+        </div>
+
+        {/* Access Denied Message */}
+        {showAccessDenied && (
+          <Card className="bg-card border-border mb-6">
+            <CardContent className="pt-6 text-center">
+              <div className="w-16 h-16 bg-muted/30 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Lock className="w-8 h-8 text-muted-foreground" />
+              </div>
+              <h2 className="text-xl font-semibold text-foreground mb-2">Admin Access Required</h2>
+              <p className="text-muted-foreground mb-4">
+                You need to sign in as admin to add products.
+              </p>
+              <Button onClick={() => navigate('/settings')} variant="premium">
+                Go to Admin Settings
+              </Button>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Form Card */}
+        <Card className={cn("bg-card border-border", showAccessDenied && "opacity-50 pointer-events-none")}>
+          <CardHeader>
+            <CardTitle className="flex items-center space-x-2">
+              <Package className="w-5 h-5 text-primary" />
+              <span>Product Information</span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={handleSubmit} className="space-y-6">
+              {/* Product Name */}
+              <div className="space-y-2">
+                <Label htmlFor="name" className="text-foreground">Product Name *</Label>
+                <Input
+                  id="name"
+                  type="text"
+                  placeholder="e.g., Coca Cola 350ml"
+                  value={formData.name}
+                  onChange={(e) => handleInputChange('name', e.target.value)}
+                  required
+                  className="bg-background border-border"
+                />
+              </div>
+
+              {/* Price and Quantity */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="price" className="text-foreground">Price (₦) *</Label>
+                  <Input
+                    id="price"
+                    type="number"
+                    placeholder="300"
+                    value={formData.price}
+                    onChange={(e) => handleInputChange('price', e.target.value)}
+                    required
+                    min="0"
+                    step="0.01"
+                    className="bg-background border-border"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="quantity" className="text-foreground">Quantity *</Label>
+                  <Input
+                    id="quantity"
+                    type="number"
+                    placeholder="24"
+                    value={formData.quantity}
+                    onChange={(e) => handleInputChange('quantity', e.target.value)}
+                    required
+                    min="0"
+                    className="bg-background border-border"
+                  />
+                </div>
+              </div>
+
+              {/* Category */}
+              <div className="space-y-2">
+                <Label htmlFor="category" className="text-foreground">Category *</Label>
+                <Select onValueChange={(value) => handleInputChange('category', value)}>
+                  <SelectTrigger className="bg-background border-border">
+                    <SelectValue placeholder="Select a category" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {categories.map((category) => (
+                      <SelectItem key={category.id} value={category.name}>
+                        {category.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Image Upload */}
+              <div className="space-y-2">
+                <Label htmlFor="image" className="text-foreground flex items-center space-x-2">
+                  <ImageIcon className="w-4 h-4" />
+                  <span>Product Image (optional)</span>
+                </Label>
+                <Input
+                  id="image"
+                  type="file"
+                  accept="image/*"
+                  onChange={handleImageChange}
+                  className="bg-background border-border cursor-pointer"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Upload an image of your product. Supported formats: JPG, PNG, GIF
+                </p>
+              </div>
+
+              {/* Image Preview */}
+              {imagePreview && (
+                <div className="space-y-2">
+                  <Label className="text-foreground">Image Preview</Label>
+                  <div className="aspect-square w-32 rounded-lg overflow-hidden border border-border">
+                    <img
+                      src={imagePreview}
+                      alt="Product preview"
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* Submit Button */}
+              <div className="flex space-x-3 pt-4">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => navigate('/')}
+                  className="flex-1"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  variant="premium"
+                  disabled={loading || !formData.name || !formData.price || !formData.quantity || !formData.category}
+                  className="flex-1"
+                >
+                  {loading ? (
+                    <div className="w-4 h-4 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin" />
+                  ) : (
+                    <>
+                      <Plus className="w-4 h-4" />
+                      Add Product
+                    </>
+                  )}
+                </Button>
+              </div>
+            </form>
+          </CardContent>
+        </Card>
+
+        {/* Cashier Dialog - Only show if dialog is not disabled */}
+        {!adminSettings?.disableCashierDialog && (
+          <EnhancedCashierDialog
+            open={showCashierDialog}
+            onOpenChange={setShowCashierDialog}
+            onConfirm={handleCashierConfirm}
+            title="Add Product"
+            description="Please enter the cashier's name to proceed with adding this product."
+            loading={loading}
+          />
+        )}
+      </div>
+    </Layout>
+  );
+};
+
+export default AddProduct;

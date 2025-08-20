@@ -1,0 +1,519 @@
+import React from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
+import { format } from 'date-fns';
+import { 
+  ArrowLeft, 
+  Activity, 
+  Plus, 
+  Edit, 
+  Trash, 
+  Receipt, 
+  LogIn, 
+  LogOut, 
+  Calendar, 
+  User, 
+  Package,
+  DollarSign,
+  Hash,
+  Tag,
+  Settings,
+  ShieldCheck,
+  ShieldX
+} from 'lucide-react';
+import { useProducts } from '@/contexts/SupabaseProductContext';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Separator } from '@/components/ui/separator';
+import Layout from '@/components/Layout';
+
+const ActivityDetails: React.FC = () => {
+  const { activityId } = useParams<{ activityId: string }>();
+  const navigate = useNavigate();
+  const { activityLogs } = useProducts();
+
+  const activity = activityLogs.find(log => log.id === activityId);
+
+  if (!activity) {
+    return (
+      <Layout>
+        <div className="container mx-auto px-4 py-6">
+          <div className="text-center py-12">
+            <div className="w-16 h-16 bg-muted/30 rounded-full flex items-center justify-center mx-auto mb-4">
+              <Activity className="w-8 h-8 text-muted-foreground" />
+            </div>
+            <h3 className="text-lg font-medium text-foreground mb-2">Activity not found</h3>
+            <p className="text-muted-foreground mb-4">
+              The activity you're looking for doesn't exist or has been removed.
+            </p>
+            <Button onClick={() => navigate('/history')} variant="outline">
+              <ArrowLeft className="w-4 h-4" />
+              Back to History
+            </Button>
+          </div>
+        </div>
+      </Layout>
+    );
+  }
+
+  const getActivityIcon = (type: string) => {
+    switch (type) {
+      case 'product_added':
+        return <Plus className="w-6 h-6" />;
+      case 'product_edited':
+        return <Edit className="w-6 h-6" />;
+      case 'product_deleted':
+        return <Trash className="w-6 h-6" />;
+      case 'sale_completed':
+        return <Receipt className="w-6 h-6" />;
+      case 'sign_in':
+      case 'user_signin':
+        return <LogIn className="w-6 h-6" />;
+      case 'sign_out':
+      case 'user_signout':
+        return <LogOut className="w-6 h-6" />;
+      case 'admin_signin':
+        return <ShieldCheck className="w-6 h-6" />;
+      case 'admin_signout':
+        return <ShieldX className="w-6 h-6" />;
+      case 'admin_settings_changed':
+        return <Settings className="w-6 h-6" />;
+      case 'category_added':
+        return <Plus className="w-6 h-6" />;
+      case 'category_edited':
+        return <Edit className="w-6 h-6" />;
+      case 'category_deleted':
+        return <Trash className="w-6 h-6" />;
+      default:
+        return <Activity className="w-6 h-6" />;
+    }
+  };
+
+  const getActivityColor = (type: string) => {
+    switch (type) {
+      case 'product_added':
+        return 'bg-green-500/20 text-green-400 border-green-500/30';
+      case 'product_edited':
+        return 'bg-blue-500/20 text-blue-400 border-blue-500/30';
+      case 'product_deleted':
+        return 'bg-red-500/20 text-red-400 border-red-500/30';
+      case 'sale_completed':
+        return 'bg-purple-500/20 text-purple-400 border-purple-500/30';
+      case 'sign_in':
+      case 'user_signin':
+        return 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30';
+      case 'sign_out':
+      case 'user_signout':
+        return 'bg-amber-500/20 text-amber-400 border-amber-500/30';
+      case 'admin_signin':
+        return 'bg-indigo-500/20 text-indigo-400 border-indigo-500/30';
+      case 'admin_signout':
+        return 'bg-rose-500/20 text-rose-400 border-rose-500/30';
+      case 'admin_settings_changed':
+        return 'bg-violet-500/20 text-violet-400 border-violet-500/30';
+      case 'category_added':
+        return 'bg-green-500/20 text-green-400 border-green-500/30';
+      case 'category_edited':
+        return 'bg-blue-500/20 text-blue-400 border-blue-500/30';
+      case 'category_deleted':
+        return 'bg-red-500/20 text-red-400 border-red-500/30';
+      default:
+        return 'bg-gray-500/20 text-gray-400 border-gray-500/30';
+    }
+  };
+
+  const getActivityTitle = (type: string) => {
+    switch (type) {
+      case 'product_added':
+        return 'Product Added';
+      case 'product_edited':
+        return 'Product Edited';
+      case 'product_deleted':
+        return 'Product Deleted';
+      case 'sale_completed':
+        return 'Sale Completed';
+      case 'sign_in':
+      case 'user_signin':
+        return 'User Sign In';
+      case 'sign_out':
+      case 'user_signout':
+        return 'User Sign Out';
+      case 'admin_signin':
+        return 'Admin Sign In';
+      case 'admin_signout':
+        return 'Admin Sign Out';
+      case 'admin_settings_changed':
+        return 'Admin Settings Changed';
+      case 'category_added':
+        return 'Category Added';
+      case 'category_edited':
+        return 'Category Edited';
+      case 'category_deleted':
+        return 'Category Deleted';
+      default:
+        return 'Activity';
+    }
+  };
+
+  return (
+    <Layout>
+      <div className="container mx-auto px-4 py-6 space-y-6">
+        {/* Header */}
+        <div className="flex items-center space-x-3">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => navigate('/history')}
+            className="text-muted-foreground hover:text-foreground"
+          >
+            <ArrowLeft className="w-5 h-5" />
+          </Button>
+          <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${getActivityColor(activity.type)}`}>
+            {getActivityIcon(activity.type)}
+          </div>
+          <div>
+            <h1 className="text-2xl font-bold text-foreground">{getActivityTitle(activity.type)}</h1>
+            <p className="text-muted-foreground">Activity details and information</p>
+          </div>
+        </div>
+
+        {/* Main Activity Card */}
+        <Card className="bg-card border-border">
+          <CardHeader>
+            <div className="flex items-start justify-between">
+              <div className="space-y-1">
+                <CardTitle className="text-foreground">{activity.description}</CardTitle>
+                <div className="flex items-center space-x-2">
+                  <Badge className={`${getActivityColor(activity.type)} text-xs`}>
+                    {activity.type.replace('_', ' ').toUpperCase()}
+                  </Badge>
+                  <div className="flex items-center space-x-1 text-sm text-muted-foreground">
+                    <Calendar className="w-4 h-4" />
+                    <span>{format(activity.timestamp, 'MMMM dd, yyyy • hh:mm:ss a')}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </CardHeader>
+          
+          <CardContent className="space-y-6">
+            {/* Basic Information */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <div className="flex items-center space-x-2 text-sm">
+                  <Hash className="w-4 h-4 text-muted-foreground" />
+                  <span className="text-muted-foreground">Activity ID:</span>
+                  <span className="text-foreground font-mono">{activity.id}</span>
+                </div>
+                <div className="flex items-center space-x-2 text-sm">
+                  <Calendar className="w-4 h-4 text-muted-foreground" />
+                  <span className="text-muted-foreground">Timestamp:</span>
+                  <span className="text-foreground">{format(activity.timestamp, 'PPPppp')}</span>
+                </div>
+              </div>
+            </div>
+
+            <Separator className="bg-border" />
+
+            {/* Cashier Information */}
+            {activity.details?.cashierName && (
+              <div className="space-y-2">
+                <h3 className="text-lg font-semibold text-foreground">Cashier Information</h3>
+                <div className="bg-muted/30 rounded-lg p-4">
+                  <div className="flex items-center space-x-2">
+                    <User className="w-4 h-4 text-muted-foreground" />
+                    <span className="text-sm text-muted-foreground">Performed by:</span>
+                    <span className="text-foreground font-medium">{activity.details.cashierName}</span>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Detailed Information */}
+            {activity.details && (activity.type === 'sale_completed' || activity.type === 'product_added' || activity.type === 'product_edited' || activity.type === 'product_deleted' || activity.type === 'category_added' || activity.type === 'category_edited' || activity.type === 'category_deleted') && (
+              <div className="space-y-4">
+                <h3 className="text-lg font-semibold text-foreground">Detailed Information</h3>
+                
+                {/* Sale Completed Details */}
+                {activity.type === 'sale_completed' && activity.details.items && (
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <Card className="bg-muted/30 border-border">
+                        <CardContent className="p-4">
+                          <div className="flex items-center space-x-2">
+                            <DollarSign className="w-5 h-5 text-green-400" />
+                            <div>
+                              <p className="text-sm text-muted-foreground">Total Amount</p>
+                              <p className="text-xl font-bold text-foreground">{activity.details.total}</p>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                      
+                      <Card className="bg-muted/30 border-border">
+                        <CardContent className="p-4">
+                          <div className="flex items-center space-x-2">
+                            <Package className="w-5 h-5 text-blue-400" />
+                            <div>
+                              <p className="text-sm text-muted-foreground">Items Count</p>
+                              <p className="text-xl font-bold text-foreground">{activity.details.items?.length || 0}</p>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                      
+                      <Card className="bg-muted/30 border-border">
+                        <CardContent className="p-4">
+                          <div className="flex items-center space-x-2">
+                            <Receipt className="w-5 h-5 text-purple-400" />
+                            <div>
+                              <p className="text-sm text-muted-foreground">Payment Method</p>
+                              <p className="text-xl font-bold text-foreground capitalize">{activity.details.paymentMethod}</p>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    </div>
+                    
+                    {/* Customer Details for Transfer Payments */}
+                    {activity.details.paymentMethod === 'transfer' && activity.details.customer && (
+                      <div className="space-y-2">
+                        <h4 className="font-medium text-foreground">Customer Details</h4>
+                        <div className="bg-muted/30 rounded-lg p-4 space-y-3">
+                          <div className="flex items-center space-x-2">
+                            <User className="w-4 h-4 text-muted-foreground" />
+                            <span className="text-sm text-muted-foreground">Name:</span>
+                            <span className="text-foreground font-medium">{activity.details.customer.name}</span>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <User className="w-4 h-4 text-muted-foreground" />
+                            <span className="text-sm text-muted-foreground">Phone:</span>
+                            <span className="text-foreground font-medium">{activity.details.customer.phone}</span>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                    
+                    <div className="space-y-2">
+                      <h4 className="font-medium text-foreground">Items Sold</h4>
+                      <div className="bg-muted/30 rounded-lg p-4 space-y-2">
+                        {activity.details.items.map((item: string, index: number) => (
+                          <div key={index} className="flex items-center space-x-2 p-2 bg-card rounded border-l-4 border-primary">
+                            <Package className="w-4 h-4 text-muted-foreground" />
+                            <span className="text-foreground">{item}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Product Added Details */}
+                {activity.type === 'product_added' && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <Card className="bg-muted/30 border-border">
+                      <CardContent className="p-4">
+                        <div className="flex items-center space-x-2">
+                          <DollarSign className="w-5 h-5 text-green-400" />
+                          <div>
+                            <p className="text-sm text-muted-foreground">Price</p>
+                            <p className="text-lg font-bold text-foreground">{activity.details.price}</p>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                    
+                    <Card className="bg-muted/30 border-border">
+                      <CardContent className="p-4">
+                        <div className="flex items-center space-x-2">
+                          <Package className="w-5 h-5 text-blue-400" />
+                          <div>
+                            <p className="text-sm text-muted-foreground">Initial Stock</p>
+                            <p className="text-lg font-bold text-foreground">{activity.details.quantity}</p>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                    
+                    <Card className="bg-muted/30 border-border">
+                      <CardContent className="p-4">
+                        <div className="flex items-center space-x-2">
+                          <Tag className="w-5 h-5 text-purple-400" />
+                          <div>
+                            <p className="text-sm text-muted-foreground">Category</p>
+                            <p className="text-lg font-bold text-foreground">{activity.details.category}</p>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </div>
+                )}
+
+                {/* Product Edited Details */}
+                {activity.type === 'product_edited' && activity.details.changes && (
+                  <div className="space-y-2">
+                    <h4 className="font-medium text-foreground">Changes Made</h4>
+                    <div className="bg-muted/30 rounded-lg p-4 space-y-2">
+                      {activity.details.changes.map((change: string, index: number) => (
+                        <div key={index} className="flex items-center space-x-2 p-2 bg-card rounded border-l-4 border-blue-500">
+                          <Edit className="w-4 h-4 text-blue-400" />
+                          <span className="text-foreground">{change}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Product Deleted Details */}
+                {activity.type === 'product_deleted' && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <Card className="bg-red-500/10 border-red-500/20">
+                      <CardContent className="p-4">
+                        <div className="flex items-center space-x-2">
+                          <DollarSign className="w-5 h-5 text-red-400" />
+                          <div>
+                            <p className="text-sm text-muted-foreground">Last Price</p>
+                            <p className="text-lg font-bold text-foreground">{activity.details.price}</p>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                    
+                    <Card className="bg-red-500/10 border-red-500/20">
+                      <CardContent className="p-4">
+                        <div className="flex items-center space-x-2">
+                          <Package className="w-5 h-5 text-red-400" />
+                          <div>
+                            <p className="text-sm text-muted-foreground">Stock at Deletion</p>
+                            <p className="text-lg font-bold text-foreground">{activity.details.quantity}</p>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                    
+                    <Card className="bg-red-500/10 border-red-500/20">
+                      <CardContent className="p-4">
+                        <div className="flex items-center space-x-2">
+                          <Tag className="w-5 h-5 text-red-400" />
+                          <div>
+                            <p className="text-sm text-muted-foreground">Category</p>
+                            <p className="text-lg font-bold text-foreground">{activity.details.category}</p>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </div>
+                )}
+
+                {/* Category Added Details */}
+                {activity.type === 'category_added' && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <Card className="bg-green-500/10 border-green-500/20">
+                      <CardContent className="p-4">
+                        <div className="flex items-center space-x-2">
+                          <Tag className="w-5 h-5 text-green-400" />
+                          <div>
+                            <p className="text-sm text-muted-foreground">Category Name</p>
+                            <p className="text-lg font-bold text-foreground">{activity.details.categoryName}</p>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </div>
+                )}
+
+                {/* Category Edited Details */}
+                {activity.type === 'category_edited' && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <Card className="bg-blue-500/10 border-blue-500/20">
+                      <CardContent className="p-4">
+                        <div className="flex items-center space-x-2">
+                          <Tag className="w-5 h-5 text-blue-400" />
+                          <div>
+                            <p className="text-sm text-muted-foreground">Previous Name</p>
+                            <p className="text-lg font-bold text-foreground">{activity.details.oldName}</p>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                    
+                    <Card className="bg-blue-500/10 border-blue-500/20">
+                      <CardContent className="p-4">
+                        <div className="flex items-center space-x-2">
+                          <Tag className="w-5 h-5 text-blue-400" />
+                          <div>
+                            <p className="text-sm text-muted-foreground">New Name</p>
+                            <p className="text-lg font-bold text-foreground">{activity.details.newName}</p>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </div>
+                )}
+
+                {/* Category Deleted Details */}
+                {activity.type === 'category_deleted' && (
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <Card className="bg-red-500/10 border-red-500/20">
+                        <CardContent className="p-4">
+                          <div className="flex items-center space-x-2">
+                            <Tag className="w-5 h-5 text-red-400" />
+                            <div>
+                              <p className="text-sm text-muted-foreground">Category Name</p>
+                              <p className="text-lg font-bold text-foreground">{activity.details.categoryName}</p>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                      
+                      <Card className="bg-red-500/10 border-red-500/20">
+                        <CardContent className="p-4">
+                          <div className="flex items-center space-x-2">
+                            <Package className="w-5 h-5 text-red-400" />
+                            <div>
+                              <p className="text-sm text-muted-foreground">Products Affected</p>
+                              <p className="text-lg font-bold text-foreground">{activity.details.productsAffected}</p>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    </div>
+                    
+                    {activity.details.productsMoved && activity.details.productsMoved.length > 0 && (
+                      <div className="space-y-2">
+                        <h4 className="font-medium text-foreground">Products Moved to 'Other'</h4>
+                        <div className="bg-red-500/10 rounded-lg p-4 space-y-2">
+                          {activity.details.productsMoved.map((productName: string, index: number) => (
+                            <div key={index} className="flex items-center space-x-2 p-2 bg-card rounded border-l-4 border-red-500">
+                              <Package className="w-4 h-4 text-red-400" />
+                              <span className="text-foreground">{productName}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    
+                    <Card className="bg-red-500/10 border-red-500/20">
+                      <CardContent className="p-4">
+                        <div className="flex items-center space-x-2">
+                          <Activity className="w-5 h-5 text-red-400" />
+                          <div>
+                            <p className="text-sm text-muted-foreground">Action</p>
+                            <p className="text-sm text-foreground">{activity.details.action}</p>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </div>
+                )}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+    </Layout>
+  );
+};
+
+export default ActivityDetails;

@@ -1,0 +1,249 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Quik Shopping Dark Theme Design System */
+
+@layer base {
+  :root {
+    /* Light Theme - Professional & Bold POS Design */
+    --background: 0 0% 100%; /* Pure white background */
+    --foreground: 0 0% 15%; /* Dark gray for strong contrast */
+
+    --card: 0 0% 100%; /* Pure white cards */
+    --card-foreground: 0 0% 15%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 0 0% 15%;
+
+    /* Emerald/Teal System matching dark mode aesthetic */
+    --primary: 160 84% 39%; /* Same emerald as dark mode for consistency */
+    --primary-foreground: 0 0% 100%; /* White text on emerald */
+    --primary-hover: 160 84% 35%; /* Darker on hover */
+
+    /* Professional grays with better contrast */
+    --secondary: 0 0% 96%; /* Light gray background */
+    --secondary-foreground: 0 0% 15%; /* Dark text */
+
+    --muted: 0 0% 96%; /* Light muted elements */
+    --muted-foreground: 0 0% 45%; /* Medium gray text */
+
+    --accent: 160 84% 39%; /* Match primary for consistency */
+    --accent-foreground: 0 0% 100%;
+
+    /* State colors matching dark mode aesthetic but with proper light contrast */
+    --success: 142 76% 36%; /* Same green as dark mode */
+    --success-foreground: 0 0% 100%;
+    
+    --warning: 45 93% 47%; /* Same amber as dark mode */
+    --warning-foreground: 0 0% 15%; /* Dark text for better contrast on yellow */
+
+    --destructive: 0 84% 60%; /* Same red as dark mode */
+    --destructive-foreground: 0 0% 100%;
+
+    /* Professional borders and inputs */
+    --border: 0 0% 90%; /* Light gray borders */
+    --input: 0 0% 98%; /* Very light input backgrounds */
+    --ring: 160 84% 39%; /* Match primary */
+
+    --radius: 0.75rem;
+
+    /* Professional gradients matching dark mode colors */
+    --gradient-primary: linear-gradient(135deg, hsl(var(--primary)), hsl(var(--primary-hover)));
+    --gradient-card: linear-gradient(135deg, hsl(var(--card)), hsl(var(--secondary)));
+    --gradient-subtle: linear-gradient(180deg, hsl(var(--secondary)), hsl(var(--muted)));
+
+    /* Professional shadows with better visibility */
+    --shadow-sm: 0 1px 2px 0 rgba(15, 23, 42, 0.05);
+    --shadow-md: 0 4px 6px -1px rgba(15, 23, 42, 0.07);
+    --shadow-lg: 0 10px 15px -3px rgba(15, 23, 42, 0.1);
+    --shadow-glow: 0 0 25px rgba(5, 150, 105, 0.15);
+
+    --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    --transition-bounce: all 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+
+    --sidebar-background: 0 0% 98%;
+    --sidebar-foreground: 240 5.3% 26.1%;
+    --sidebar-primary: 240 5.9% 10%;
+    --sidebar-primary-foreground: 0 0% 98%;
+    --sidebar-accent: 240 4.8% 95.9%;
+    --sidebar-accent-foreground: 240 5.9% 10%;
+    --sidebar-border: 220 13% 91%;
+    --sidebar-ring: 217.2 91.2% 59.8%;
+  }
+
+  .dark {
+    /* Dark Theme */
+    --background: 0 0% 4%; /* #0A0A0A - Deep black */
+    --foreground: 0 0% 95%; /* #F2F2F2 - Almost white */
+
+    --card: 0 0% 7%; /* #121212 - Card background */
+    --card-foreground: 0 0% 95%;
+
+    --popover: 0 0% 7%;
+    --popover-foreground: 0 0% 95%;
+
+    /* Emerald/Teal Accent System */
+    --primary: 160 84% 39%; /* #10B981 - Emerald 500 */
+    --primary-foreground: 0 0% 4%;
+    --primary-hover: 160 84% 35%; /* Darker on hover */
+
+    /* Secondary grays for subtle elements */
+    --secondary: 0 0% 15%; /* #262626 - Dark gray */
+    --secondary-foreground: 0 0% 85%;
+
+    --muted: 0 0% 12%; /* #1F1F1F - Muted elements */
+    --muted-foreground: 0 0% 65%; /* #A6A6A6 - Muted text */
+
+    --accent: 160 84% 39%; /* Same as primary for consistency */
+    --accent-foreground: 0 0% 4%;
+
+    /* Success, Warning, Error states */
+    --success: 142 76% 36%; /* Green for success */
+    --success-foreground: 0 0% 95%;
+    
+    --warning: 45 93% 47%; /* Amber for warnings */
+    --warning-foreground: 0 0% 4%;
+
+    --destructive: 0 84% 60%; /* Red for errors */
+    --destructive-foreground: 0 0% 95%;
+
+    /* Borders and inputs */
+    --border: 0 0% 20%; /* #333333 - Subtle borders */
+    --input: 0 0% 15%; /* #262626 - Input backgrounds */
+    --ring: 160 84% 39%; /* Focus rings match primary */
+
+    --radius: 0.75rem; /* Slightly more rounded for modern look */
+
+    /* Custom gradients for premium feel */
+    --gradient-primary: linear-gradient(135deg, hsl(160 84% 39%), hsl(160 84% 35%));
+    --gradient-card: linear-gradient(135deg, hsl(0 0% 7%), hsl(0 0% 9%));
+    --gradient-subtle: linear-gradient(180deg, hsl(0 0% 4%), hsl(0 0% 6%));
+
+    /* Shadows for depth */
+    --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.3);
+    --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.4);
+    --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.5);
+    --shadow-glow: 0 0 20px rgba(16, 185, 129, 0.15);
+
+    --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    --transition-bounce: all 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+
+    --sidebar-background: 0 0% 98%;
+    --sidebar-foreground: 240 5.3% 26.1%;
+    --sidebar-primary: 240 5.9% 10%;
+    --sidebar-primary-foreground: 0 0% 98%;
+    --sidebar-accent: 240 4.8% 95.9%;
+    --sidebar-accent-foreground: 240 5.9% 10%;
+    --sidebar-border: 220 13% 91%;
+    --sidebar-ring: 217.2 91.2% 59.8%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground min-h-screen;
+    font-family: system-ui, -apple-system, sans-serif;
+    overflow-x: hidden; /* Prevent horizontal scroll on mobile */
+  }
+
+  /* Mobile-first touch optimizations */
+  button, [role="button"] {
+    @apply transition-all duration-300 ease-out;
+    @apply active:scale-95;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  /* Smooth scrolling for mobile */
+  html {
+    scroll-behavior: smooth;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Custom scrollbar for webkit browsers */
+  ::-webkit-scrollbar {
+    width: 4px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: hsl(var(--muted));
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: hsl(var(--border));
+    border-radius: 2px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: hsl(var(--primary));
+  }
+}
+
+@layer components {
+  /* Custom gradient backgrounds */
+  .bg-gradient-primary {
+    background: var(--gradient-primary);
+  }
+
+  .bg-gradient-card {
+    background: var(--gradient-card);
+  }
+
+  .bg-gradient-subtle {
+    background: var(--gradient-subtle);
+  }
+
+  /* Custom shadows */
+  .shadow-glow {
+    box-shadow: var(--shadow-glow);
+  }
+
+  /* Mobile-optimized touch targets */
+  .touch-target {
+    @apply min-h-[44px] min-w-[44px] flex items-center justify-center;
+  }
+
+  /* Smooth transitions */
+  .transition-smooth {
+    transition: var(--transition-smooth);
+  }
+
+  .transition-bounce {
+    transition: var(--transition-bounce);
+  }
+
+  /* Loading shimmer effect */
+  .shimmer {
+    background: linear-gradient(
+      90deg,
+      hsl(var(--muted)) 0%,
+      hsl(var(--border)) 50%,
+      hsl(var(--muted)) 100%
+    );
+    background-size: 200% 100%;
+    animation: shimmer 1.5s infinite;
+  }
+
+  @keyframes shimmer {
+    0% { background-position: -200% 0; }
+    100% { background-position: 200% 0; }
+  }
+
+  /* Success state animations */
+  .pulse-success {
+    animation: pulse-success 0.6s ease-in-out;
+  }
+
+  @keyframes pulse-success {
+    0%, 100% { 
+      box-shadow: 0 0 0 0 hsl(var(--success) / 0.4);
+    }
+    50% { 
+      box-shadow: 0 0 0 10px hsl(var(--success) / 0);
+    }
+  }
+}
