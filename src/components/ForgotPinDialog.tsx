@@ -39,11 +39,8 @@ const ForgotPinDialog: React.FC<ForgotPinDialogProps> = ({
     setOtpLoading(true);
 
     try {
-      const { error } = await supabase.auth.signInWithOtp({
-        email: formData.email,
-        options: {
-          shouldCreateUser: false
-        }
+      const { data, error } = await supabase.functions.invoke('send-otp', {
+        body: { email: formData.email }
       });
 
       if (error) throw error;
@@ -51,8 +48,18 @@ const ForgotPinDialog: React.FC<ForgotPinDialogProps> = ({
       setStep('otp');
       toast({
         title: "OTP sent",
-        description: "Check your email for the verification code.",
+        description: "Check your email for the 6-digit verification code.",
       });
+
+      // Show OTP in console for development
+      if (data?.devOtp) {
+        console.log('Development OTP:', data.devOtp);
+        toast({
+          title: "Development Mode",
+          description: `OTP: ${data.devOtp} (check console)`,
+          variant: "default",
+        });
+      }
     } catch (error: any) {
       setError(error.message || 'Failed to send OTP');
     } finally {
@@ -65,17 +72,19 @@ const ForgotPinDialog: React.FC<ForgotPinDialogProps> = ({
     setError('');
 
     try {
-      const { error } = await supabase.auth.verifyOtp({
-        email: formData.email,
-        token: formData.otp,
-        type: 'email'
+      const { data, error } = await supabase.functions.invoke('verify-otp', {
+        body: { 
+          email: formData.email,
+          otp: formData.otp 
+        }
       });
 
       if (error) throw error;
+      if (!data?.verified) throw new Error('OTP verification failed');
 
       setStep('reset');
       toast({
-        title: "Email verified",
+        title: "OTP verified",
         description: "You can now set a new PIN.",
       });
     } catch (error: any) {

@@ -51,6 +51,39 @@ CREATE TRIGGER handle_admin_settings_updated_at
 -- Grant permissions
 GRANT ALL ON public.admin_settings TO authenticated;
 GRANT ALL ON public.admin_settings TO service_role;
+
+-- Create OTP codes table for PIN reset functionality
+CREATE TABLE IF NOT EXISTS public.otp_codes (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+    email TEXT NOT NULL,
+    code TEXT NOT NULL,
+    type TEXT NOT NULL DEFAULT 'pin_reset',
+    expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    used BOOLEAN DEFAULT false,
+    used_at TIMESTAMP WITH TIME ZONE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
+    
+    CONSTRAINT otp_codes_type_check CHECK (type IN ('pin_reset', 'email_verification'))
+);
+
+-- Enable RLS for OTP codes
+ALTER TABLE public.otp_codes ENABLE ROW LEVEL SECURITY;
+
+-- Create RLS policies for OTP codes
+CREATE POLICY "Users can only access their own OTP codes" 
+ON public.otp_codes 
+FOR ALL 
+USING (auth.uid() = user_id);
+
+-- Create index for performance
+CREATE INDEX IF NOT EXISTS idx_otp_codes_user_email 
+ON public.otp_codes(user_id, email, code, expires_at) 
+WHERE used = false;
+
+-- Grant permissions for OTP codes
+GRANT ALL ON public.otp_codes TO authenticated;
+GRANT ALL ON public.otp_codes TO service_role;
 ```
 
 ### Step 1.5: Add Missing Column (If you already ran the above SQL)
@@ -94,5 +127,8 @@ The following edge functions are already deployed:
 - `admin-setup`: Creates admin settings
 - `admin-verify`: Verifies PIN and creates session
 - `admin-reset-pin`: Resets PIN via email OTP
+- `send-otp`: Generates and sends OTP codes for PIN reset
+- `verify-otp`: Verifies OTP codes before allowing PIN reset
+- `send-email`: Email service integration (configure with your preferred provider)
 
 Once you run the SQL above, the entire admin system will be fully operational!

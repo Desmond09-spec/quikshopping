@@ -78,6 +78,14 @@ const ActivityDetails: React.FC = () => {
         return <ShieldX className="w-6 h-6" />;
       case 'admin_settings_changed':
         return <Settings className="w-6 h-6" />;
+      case 'admin_pin_reset':
+        return <ShieldCheck className="w-6 h-6" />;
+      case 'cashier_mode_changed':
+        return <Settings className="w-6 h-6" />;
+      case 'cashier_added':
+        return <User className="w-6 h-6" />;
+      case 'cashier_removed':
+        return <User className="w-6 h-6" />;
       case 'category_added':
         return <Plus className="w-6 h-6" />;
       case 'category_edited':
@@ -111,6 +119,14 @@ const ActivityDetails: React.FC = () => {
         return 'bg-rose-500/20 text-rose-400 border-rose-500/30';
       case 'admin_settings_changed':
         return 'bg-violet-500/20 text-violet-400 border-violet-500/30';
+      case 'admin_pin_reset':
+        return 'bg-cyan-500/20 text-cyan-400 border-cyan-500/30';
+      case 'cashier_mode_changed':
+        return 'bg-orange-500/20 text-orange-400 border-orange-500/30';
+      case 'cashier_added':
+        return 'bg-teal-500/20 text-teal-400 border-teal-500/30';
+      case 'cashier_removed':
+        return 'bg-pink-500/20 text-pink-400 border-pink-500/30';
       case 'category_added':
         return 'bg-green-500/20 text-green-400 border-green-500/30';
       case 'category_edited':
@@ -144,6 +160,14 @@ const ActivityDetails: React.FC = () => {
         return 'Admin Sign Out';
       case 'admin_settings_changed':
         return 'Admin Settings Changed';
+      case 'admin_pin_reset':
+        return 'Admin PIN Reset';
+      case 'cashier_mode_changed':
+        return 'Cashier Sign-In Mode Changed';
+      case 'cashier_added':
+        return 'Cashier Added';
+      case 'cashier_removed':
+        return 'Cashier Removed';
       case 'category_added':
         return 'Category Added';
       case 'category_edited':
@@ -230,7 +254,7 @@ const ActivityDetails: React.FC = () => {
             )}
 
             {/* Detailed Information */}
-            {activity.details && (activity.type === 'sale_completed' || activity.type === 'product_added' || activity.type === 'product_edited' || activity.type === 'product_deleted' || activity.type === 'category_added' || activity.type === 'category_edited' || activity.type === 'category_deleted') && (
+            {activity.details && (activity.type === 'sale_completed' || activity.type === 'product_added' || activity.type === 'product_edited' || activity.type === 'product_deleted' || activity.type === 'category_added' || activity.type === 'category_edited' || activity.type === 'category_deleted' || activity.type === 'cashier_mode_changed' || activity.type === 'cashier_added' || activity.type === 'cashier_removed' || activity.type === 'admin_pin_reset') && (
               <div className="space-y-4">
                 <h3 className="text-lg font-semibold text-foreground">Detailed Information</h3>
                 
@@ -501,6 +525,126 @@ const ActivityDetails: React.FC = () => {
                           <div>
                             <p className="text-sm text-muted-foreground">Action</p>
                             <p className="text-sm text-foreground">{activity.details.action}</p>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </div>
+                )}
+
+                {/* Cashier Mode Changed Details */}
+                {activity.type === 'cashier_mode_changed' && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <Card className="bg-orange-500/10 border-orange-500/20">
+                      <CardContent className="p-4">
+                        <div className="flex items-center space-x-2">
+                          <Settings className="w-5 h-5 text-orange-400" />
+                          <div>
+                            <p className="text-sm text-muted-foreground">New Mode</p>
+                            <p className="text-lg font-bold text-foreground">
+                              {activity.details.newMode === 'dropdown' ? 'Secure (Dropdown)' : 'Free Text'}
+                            </p>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                    
+                    <Card className="bg-orange-500/10 border-orange-500/20">
+                      <CardContent className="p-4">
+                        <div className="flex items-center space-x-2">
+                          <User className="w-5 h-5 text-orange-400" />
+                          <div>
+                            <p className="text-sm text-muted-foreground">Changed by</p>
+                            <p className="text-lg font-bold text-foreground">{activity.details.changedBy || 'Admin'}</p>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </div>
+                )}
+
+                {/* Cashier Added Details */}
+                {activity.type === 'cashier_added' && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <Card className="bg-teal-500/10 border-teal-500/20">
+                      <CardContent className="p-4">
+                        <div className="flex items-center space-x-2">
+                          <User className="w-5 h-5 text-teal-400" />
+                          <div>
+                            <p className="text-sm text-muted-foreground">Cashier Name</p>
+                            <p className="text-lg font-bold text-foreground">{activity.details.cashierName}</p>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                    
+                    <Card className="bg-teal-500/10 border-teal-500/20">
+                      <CardContent className="p-4">
+                        <div className="flex items-center space-x-2">
+                          <ShieldCheck className="w-5 h-5 text-teal-400" />
+                          <div>
+                            <p className="text-sm text-muted-foreground">Added by</p>
+                            <p className="text-lg font-bold text-foreground">{activity.details.addedBy || 'Admin'}</p>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </div>
+                )}
+
+                {/* Cashier Removed Details */}
+                {activity.type === 'cashier_removed' && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <Card className="bg-pink-500/10 border-pink-500/20">
+                      <CardContent className="p-4">
+                        <div className="flex items-center space-x-2">
+                          <User className="w-5 h-5 text-pink-400" />
+                          <div>
+                            <p className="text-sm text-muted-foreground">Cashier Name</p>
+                            <p className="text-lg font-bold text-foreground">{activity.details.cashierName}</p>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                    
+                    <Card className="bg-pink-500/10 border-pink-500/20">
+                      <CardContent className="p-4">
+                        <div className="flex items-center space-x-2">
+                          <ShieldX className="w-5 h-5 text-pink-400" />
+                          <div>
+                            <p className="text-sm text-muted-foreground">Removed by</p>
+                            <p className="text-lg font-bold text-foreground">{activity.details.removedBy || 'Admin'}</p>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </div>
+                )}
+
+                {/* Admin PIN Reset Details */}
+                {activity.type === 'admin_pin_reset' && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <Card className="bg-cyan-500/10 border-cyan-500/20">
+                      <CardContent className="p-4">
+                        <div className="flex items-center space-x-2">
+                          <ShieldCheck className="w-5 h-5 text-cyan-400" />
+                          <div>
+                            <p className="text-sm text-muted-foreground">Admin Email</p>
+                            <p className="text-lg font-bold text-foreground">{activity.details.adminEmail}</p>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                    
+                    <Card className="bg-cyan-500/10 border-cyan-500/20">
+                      <CardContent className="p-4">
+                        <div className="flex items-center space-x-2">
+                          <Calendar className="w-5 h-5 text-cyan-400" />
+                          <div>
+                            <p className="text-sm text-muted-foreground">Reset Time</p>
+                            <p className="text-sm font-medium text-foreground">
+                              {activity.details.resetTime ? format(new Date(activity.details.resetTime), 'PPp') : 'N/A'}
+                            </p>
                           </div>
                         </div>
                       </CardContent>

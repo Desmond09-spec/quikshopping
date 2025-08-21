@@ -116,6 +116,14 @@ const History: React.FC = () => {
         return <ShieldX className="w-4 h-4" />;
       case 'admin_settings_changed':
         return <Settings className="w-4 h-4" />;
+      case 'admin_pin_reset':
+        return <ShieldCheck className="w-4 h-4" />;
+      case 'cashier_mode_changed':
+        return <Settings className="w-4 h-4" />;
+      case 'cashier_added':
+        return <User className="w-4 h-4" />;
+      case 'cashier_removed':
+        return <User className="w-4 h-4" />;
       case 'category_added':
         return <Plus className="w-4 h-4" />;
       case 'category_edited':
@@ -149,6 +157,14 @@ const History: React.FC = () => {
         return 'bg-rose-500/20 text-rose-400 border-rose-500/30';
       case 'admin_settings_changed':
         return 'bg-violet-500/20 text-violet-400 border-violet-500/30';
+      case 'admin_pin_reset':
+        return 'bg-cyan-500/20 text-cyan-400 border-cyan-500/30';
+      case 'cashier_mode_changed':
+        return 'bg-orange-500/20 text-orange-400 border-orange-500/30';
+      case 'cashier_added':
+        return 'bg-teal-500/20 text-teal-400 border-teal-500/30';
+      case 'cashier_removed':
+        return 'bg-pink-500/20 text-pink-400 border-pink-500/30';
       case 'category_added':
         return 'bg-green-500/20 text-green-400 border-green-500/30';
       case 'category_edited':
@@ -195,9 +211,13 @@ const History: React.FC = () => {
                             <Activity className="w-3 h-3" />
                           </Button>
                         </PopoverTrigger>
-                        <PopoverContent className="w-auto p-2" align="start">
-                          <p className="text-sm font-medium">Full Amount</p>
-                          <p className="text-lg font-bold text-primary">₦{totalRevenue.toLocaleString()}</p>
+                        <PopoverContent className="w-auto p-0 border-0 bg-gradient-card shadow-lg" align="start">
+                          <div className="px-4 py-3 space-y-2 bg-gradient-subtle rounded-lg border border-border/50 backdrop-blur-sm">
+                            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Complete Amount</p>
+                            <p className="text-xl font-bold text-primary bg-primary/5 px-3 py-2 rounded-md border border-primary/10">
+                              ₦{totalRevenue.toLocaleString()}
+                            </p>
+                          </div>
                         </PopoverContent>
                       </Popover>
                     )}

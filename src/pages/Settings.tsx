@@ -28,6 +28,7 @@ import { Separator } from '@/components/ui/separator';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import Layout from '@/components/Layout';
 import CategoryManager from '@/components/CategoryManager';
+import CashierManagement from '@/components/CashierManagement';
 import EnhancedCashierDialog from '@/components/EnhancedCashierDialog';
 import AdminSetupDialog from '@/components/AdminSetupDialog';
 import AdminSignInDialog from '@/components/AdminSignInDialog';
@@ -42,7 +43,7 @@ interface BeforeInstallPromptEvent extends Event {
 const Settings: React.FC = () => {
   const navigate = useNavigate();
   const { user, logout } = useAuth();
-  const { products, deleteProduct, loading } = useProducts();
+  const { products, deleteProduct, loading, loadProducts } = useProducts();
   const { theme, toggleTheme } = useTheme();
   const { 
     isAdminMode, 
@@ -63,6 +64,13 @@ const Settings: React.FC = () => {
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const [isInstalled, setIsInstalled] = useState(false);
   const [installing, setInstalling] = useState(false);
+
+  // Load products when Settings loads (if authenticated)
+  useEffect(() => {
+    if (user && products.length === 0 && !loading) {
+      loadProducts();
+    }
+  }, [user, products.length, loading, loadProducts]);
 
   // PWA Install functionality
   useEffect(() => {
@@ -414,6 +422,9 @@ const Settings: React.FC = () => {
             </CardContent>
           </Card>
         )}
+
+        {/* Cashier Management */}
+        <CashierManagement />
 
         {/* Category Management */}
         <CategoryManager />

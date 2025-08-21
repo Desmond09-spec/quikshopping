@@ -21,6 +21,8 @@ interface AdminState {
   expiresAt: string | null;
   loading: boolean;
   cachedCashierNames: string[];
+  managedCashiers: string[];
+  cashierSignInMode: 'dropdown' | 'freetext';
 }
 
 interface AdminContextType extends AdminState {
@@ -35,6 +37,9 @@ interface AdminContextType extends AdminState {
   clearCachedCashierNames: () => void;
   isSessionValid: () => boolean;
   loadAdminSettings: () => Promise<void>;
+  addManagedCashier: (name: string) => Promise<void>;
+  removeManagedCashier: (name: string) => Promise<void>;
+  setCashierSignInMode: (mode: 'dropdown' | 'freetext') => Promise<void>;
 }
 
 const AdminContext = createContext<AdminContextType | null>(null);
@@ -49,7 +54,9 @@ export const AdminProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     sessionToken: null,
     expiresAt: null,
     loading: false,
-    cachedCashierNames: []
+    cachedCashierNames: [],
+    managedCashiers: [],
+    cashierSignInMode: 'freetext'
   });
 
   // Load admin settings when user changes
@@ -111,6 +118,8 @@ export const AdminProvider: React.FC<{ children: ReactNode }> = ({ children }) =
           createdAt: data.created_at,
           updatedAt: data.updated_at
         } : null,
+        managedCashiers: data ? (data.managed_cashiers || []) : [],
+        cashierSignInMode: data ? (data.cashier_signin_mode || 'freetext') : 'freetext',
         loading: false
       }));
     } catch (error: any) {
@@ -404,6 +413,134 @@ export const AdminProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     return new Date() < new Date(state.expiresAt);
   };
 
+  const addManagedCashier = async (name: string) => {
+    if (!user || !state.adminSettings) return;
+
+    const trimmedName = name.trim();
+    if (!trimmedName || state.managedCashiers.includes(trimmedName)) return;
+
+    try {
+      // Update admin settings with new cashier
+      const updatedCashiers = [...state.managedCashiers, trimmedName];
+      
+      const { error } = await (supabase as any)
+        .from('admin_settings')
+        .update({ managed_cashiers: updatedCashiers })
+        .eq('owner_user_id', user.id);
+
+      if (error) throw error;
+
+      setState(prev => ({
+        ...prev,
+        managedCashiers: updatedCashiers
+      }));
+
+      // Log the addition
+      await supabase.from('activities').insert({
+        user_id: user.id,
+        type: 'cashier_added',
+        description: `Added cashier: ${trimmedName}`,
+        details: {
+          cashierName: trimmedName,
+          addedBy: state.adminSettings?.adminEmail || 'Admin'
+        }
+      });
+
+      toast({
+        title: "Cashier added",
+        description: `${trimmedName} has been added to the approved cashier list.`,
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to add cashier",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const removeManagedCashier = async (name: string) => {
+    if (!user || !state.adminSettings) return;
+
+    try {
+      const updatedCashiers = state.managedCashiers.filter(cashier => cashier !== name);
+      
+      const { error } = await (supabase as any)
+        .from('admin_settings')
+        .update({ managed_cashiers: updatedCashiers })
+        .eq('owner_user_id', user.id);
+
+      if (error) throw error;
+
+      setState(prev => ({
+        ...prev,
+        managedCashiers: updatedCashiers
+      }));
+
+      // Log the removal
+      await supabase.from('activities').insert({
+        user_id: user.id,
+        type: 'cashier_removed',
+        description: `Removed cashier: ${name}`,
+        details: {
+          cashierName: name,
+          removedBy: state.adminSettings?.adminEmail || 'Admin'
+        }
+      });
+
+      toast({
+        title: "Cashier removed",
+        description: `${name} has been removed from the approved cashier list.`,
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to remove cashier",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const setCashierSignInMode = async (mode: 'dropdown' | 'freetext') => {
+    if (!user || !state.adminSettings) return;
+
+    try {
+      const { error } = await (supabase as any)
+        .from('admin_settings')
+        .update({ cashier_signin_mode: mode })
+        .eq('owner_user_id', user.id);
+
+      if (error) throw error;
+
+      setState(prev => ({
+        ...prev,
+        cashierSignInMode: mode
+      }));
+
+      // Log the mode change
+      await supabase.from('activities').insert({
+        user_id: user.id,
+        type: 'cashier_mode_changed',
+        description: `Cashier sign-in mode changed to: ${mode}`,
+        details: {
+          newMode: mode,
+          changedBy: state.adminSettings?.adminEmail || 'Admin'
+        }
+      });
+
+      toast({
+        title: "Sign-in mode updated",
+        description: `Cashier sign-in mode set to ${mode === 'dropdown' ? 'Secure (Dropdown)' : 'Free Text'}.`,
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update sign-in mode",
+        variant: "destructive",
+      });
+    }
+  };
+
   return (
     <AdminContext.Provider value={{
       ...state,
@@ -417,7 +554,10 @@ export const AdminProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       addCachedCashierName,
       clearCachedCashierNames,
       isSessionValid,
-      loadAdminSettings
+      loadAdminSettings,
+      addManagedCashier,
+      removeManagedCashier,
+      setCashierSignInMode
     }}>
       {children}
     </AdminContext.Provider>

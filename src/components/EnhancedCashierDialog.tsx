@@ -4,7 +4,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { User, X } from 'lucide-react';
+import { User } from 'lucide-react';
 import { useAdmin } from '@/contexts/AdminContext';
 
 interface EnhancedCashierDialogProps {
@@ -24,7 +24,13 @@ const EnhancedCashierDialog: React.FC<EnhancedCashierDialogProps> = ({
   description,
   loading = false
 }) => {
-  const { cachedCashierNames, addCachedCashierName, isAdminMode, adminSettings } = useAdmin();
+  const { 
+    cachedCashierNames, 
+    addCachedCashierName, 
+    isAdminMode, 
+    managedCashiers, 
+    cashierSignInMode 
+  } = useAdmin();
   const [cashierName, setCashierName] = useState('');
 
   // Clear input when dialog opens
@@ -112,19 +118,52 @@ const EnhancedCashierDialog: React.FC<EnhancedCashierDialogProps> = ({
             <Label htmlFor="cashierName" className="text-foreground">
               {isAdminMode ? 'Enter Different Name' : 'Cashier Name'}
             </Label>
+
+            {/* Name Tags Section - Show when there are managed cashiers */}
+            {managedCashiers.length > 0 && (
+              <div className="space-y-3">
+                <p className="text-xs text-muted-foreground font-medium">Quick select:</p>
+                <div className="grid grid-cols-2 gap-2">
+                  {managedCashiers.map((name, index) => (
+                    <Button
+                      key={index}
+                      type="button"
+                      variant={cashierName === name ? "default" : "outline"}
+                      size="sm"
+                      className="justify-center h-9"
+                      onClick={() => handleSuggestionClick(name)}
+                    >
+                      <User className="w-3 h-3 mr-1" />
+                      <span className="truncate text-xs">{name}</span>
+                    </Button>
+                  ))}
+                </div>
+                
+                <div className="relative">
+                  <div className="absolute inset-0 flex items-center">
+                    <div className="w-full border-t border-border"></div>
+                  </div>
+                  <div className="relative flex justify-center text-xs uppercase">
+                    <span className="bg-card px-2 text-muted-foreground">Or enter manually</span>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Text Input - Always available */}
             <Input
               id="cashierName"
               value={cashierName}
               onChange={(e) => setCashierName(e.target.value)}
               placeholder="Enter cashier name"
               required
-              autoFocus={!isAdminMode}
+              autoFocus={!isAdminMode && managedCashiers.length === 0}
             />
 
-            {/* Cached suggestions */}
-            {cachedCashierNames.length > 0 && (
+            {/* Recent names suggestions - only show in free text mode or for admin */}
+            {(cashierSignInMode === 'freetext' || isAdminMode) && cachedCashierNames.length > 0 && (
               <div className="space-y-2">
-                <p className="text-xs text-muted-foreground font-medium">Quick select:</p>
+                <p className="text-xs text-muted-foreground font-medium">Recent names:</p>
                 <div className="flex flex-wrap gap-2">
                   {cachedCashierNames.map((name, index) => (
                     <Badge

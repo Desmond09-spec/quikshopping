@@ -19,14 +19,14 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   // Check if user should see walkthrough on first visit
   useEffect(() => {
     const hasSeenWalkthrough = localStorage.getItem('walkthrough-completed');
-    if (!hasSeenWalkthrough) {
-      // Show walkthrough after a short delay for better UX
+    if (!hasSeenWalkthrough && !user) {
+      // Show walkthrough after a short delay for better UX, only when not signed in
       const timer = setTimeout(() => {
         setShowWalkthrough(true);
       }, 1000);
       return () => clearTimeout(timer);
     }
-  }, []);
+  }, [user]);
 
   const navigation = [
     {

@@ -10,6 +10,7 @@ import { ProductProvider } from "@/contexts/SupabaseProductContext";
 import { ThemeProvider } from "@/contexts/ThemeContext";
 import { AdminProvider } from "@/contexts/AdminContext";
 import { Skeleton } from "@/components/ui/skeleton";
+import ProtectedRoute from "@/components/ProtectedRoute";
 
 // Lazy load pages for bundle splitting
 const Home = React.lazy(() => import("./pages/Home"));
@@ -55,15 +56,17 @@ const App = () => (
               <BrowserRouter>
                 <Suspense fallback={<PageLoader />}>
                   <Routes>
-                    <Route path="/" element={<Home />} />
-                    <Route path="/cart" element={<Cart />} />
-                    <Route path="/add-product" element={<AddProduct />} />
-                    <Route path="/history" element={<History />} />
-                    <Route path="/settings" element={<Settings />} />
-                    <Route path="/products-inventory" element={<ProductsInventory />} />
+                    <Route path="/" element={<ProtectedRoute><Home /></ProtectedRoute>} />
+                    <Route path="/cart" element={<ProtectedRoute><Cart /></ProtectedRoute>} />
+                    <Route path="/add-product" element={<ProtectedRoute><AddProduct /></ProtectedRoute>} />
+                    <Route path="/history" element={<ProtectedRoute><History /></ProtectedRoute>} />
+                    <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
+                    <Route path="/products-inventory" element={<ProtectedRoute><ProductsInventory /></ProtectedRoute>} />
                     <Route path="/auth" element={<Auth />} />
-                    <Route path="/edit-product/:id" element={<EditProduct />} />
-                    <Route path="/activity/:activityId" element={<ActivityDetails />} />
+                    <Route path="/signin" element={<Auth />} />
+                    <Route path="/signup" element={<Auth />} />
+                    <Route path="/edit-product/:id" element={<ProtectedRoute><EditProduct /></ProtectedRoute>} />
+                    <Route path="/activity/:activityId" element={<ProtectedRoute><ActivityDetails /></ProtectedRoute>} />
                     {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                     <Route path="*" element={<NotFound />} />
                   </Routes>

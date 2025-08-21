@@ -7,14 +7,18 @@ interface AuthState {
   user: User | null;
   session: Session | null;
   loading: boolean;
+  isAuthenticatedUser: boolean;
 }
 
 interface AuthContextType {
   user: User | null;
   session: Session | null;
   loading: boolean;
+  isAuthenticatedUser: boolean;
   signUp: (email: string, password: string, displayName?: string) => Promise<void>;
   signIn: (email: string, password: string, signInName?: string) => Promise<void>;
+  verifyAccount: (email: string, password: string) => Promise<void>;
+  completeCashierAuth: (cashierName: string) => Promise<void>;
   logout: () => Promise<void>;
 }
 
@@ -24,7 +28,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [authState, setAuthState] = useState<AuthState>({
     user: null,
     session: null,
-    loading: true
+    loading: true,
+    isAuthenticatedUser: false
   });
   const { toast } = useToast();
 
@@ -32,20 +37,24 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     // Set up auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
+        const isFullyAuthenticated = session?.user && localStorage.getItem('cashier_authenticated') === 'true';
         setAuthState({
           user: session?.user ?? null,
           session,
-          loading: false
+          loading: false,
+          isAuthenticatedUser: !!isFullyAuthenticated
         });
       }
     );
 
     // Get initial session
     supabase.auth.getSession().then(({ data: { session } }) => {
+      const isFullyAuthenticated = session?.user && localStorage.getItem('cashier_authenticated') === 'true';
       setAuthState({
         user: session?.user ?? null,
         session,
-        loading: false
+        loading: false,
+        isAuthenticatedUser: !!isFullyAuthenticated
       });
     });
 
@@ -83,7 +92,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   };
 
-  const signIn = async (email: string, password: string, signInName?: string) => {
+  const verifyAccount = async (email: string, password: string) => {
     try {
       const { error } = await supabase.auth.signInWithPassword({
         email,
@@ -92,23 +101,51 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
       if (error) throw error;
 
-      // Get the session after successful sign in
-      const { data: { session } } = await supabase.auth.getSession();
+      // Clear any previous cashier authentication
+      localStorage.removeItem('cashier_authenticated');
 
-      // Log sign-in activity
-      if (signInName && session?.user) {
-        await supabase
-          .from('activities')
-          .insert({
-            user_id: session.user.id,
-            type: 'sign_in',
-            description: `${signInName} signed in`,
-            details: {
-              userName: signInName,
-              email: email
-            }
-          });
+      toast({
+        title: "Account verified",
+        description: "Please select your cashier identity to complete sign in.",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+      throw error;
+    }
+  };
+
+  const completeCashierAuth = async (cashierName: string) => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session?.user) {
+        throw new Error('No authenticated session found');
       }
+
+      // Log sign-in activity with cashier name
+      await supabase
+        .from('activities')
+        .insert({
+          user_id: session.user.id,
+          type: 'sign_in',
+          description: `${cashierName} signed in`,
+          details: {
+            userName: cashierName,
+            email: session.user.email
+          }
+        });
+
+      // Mark as fully authenticated
+      localStorage.setItem('cashier_authenticated', 'true');
+      
+      setAuthState(prev => ({
+        ...prev,
+        isAuthenticatedUser: true
+      }));
 
       toast({
         title: "Welcome back",
@@ -120,6 +157,17 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         description: error.message,
         variant: "destructive",
       });
+      throw error;
+    }
+  };
+
+  const signIn = async (email: string, password: string, signInName?: string) => {
+    try {
+      await verifyAccount(email, password);
+      if (signInName) {
+        await completeCashierAuth(signInName);
+      }
+    } catch (error: any) {
       throw error;
     }
   };
@@ -161,6 +209,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       if (error) throw error;
 
       // Clear all user-specific data from localStorage/sessionStorage
+      localStorage.removeItem('cashier_authenticated');
       localStorage.clear();
       sessionStorage.clear();
 
@@ -183,8 +232,11 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       user: authState.user,
       session: authState.session,
       loading: authState.loading,
+      isAuthenticatedUser: authState.isAuthenticatedUser,
       signUp,
       signIn,
+      verifyAccount,
+      completeCashierAuth,
       logout
     }}>
       {children}

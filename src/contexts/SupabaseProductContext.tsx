@@ -203,10 +203,34 @@ export const ProductProvider: React.FC<{ children: ReactNode }> = ({ children })
 
       if (categoriesError) throw categoriesError;
 
-      const transformedCategories: Category[] = categories.map(cat => ({
+      let transformedCategories: Category[] = categories.map(cat => ({
         id: cat.id,
         name: cat.name
       }));
+
+      // Ensure "Other" category always exists
+      const hasOtherCategory = transformedCategories.some(cat => cat.name === 'Other');
+      if (!hasOtherCategory) {
+        try {
+          const { data: otherCategory, error: otherError } = await supabase
+            .from('categories')
+            .insert({
+              user_id: user.id,
+              name: 'Other'
+            })
+            .select()
+            .single();
+
+          if (!otherError && otherCategory) {
+            transformedCategories.push({
+              id: otherCategory.id,
+              name: otherCategory.name
+            });
+          }
+        } catch (otherCategoryError) {
+          console.warn('Could not create Other category:', otherCategoryError);
+        }
+      }
 
       setAuthenticatedState(prev => ({
         ...prev,

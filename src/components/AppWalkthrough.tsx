@@ -9,11 +9,15 @@ import {
   History, 
   Settings,
   Download,
-  CheckCircle
+  CheckCircle,
+  LogIn,
+  UserCheck
 } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogOverlay } from '@/components/ui/dialog';
+import { useAuth } from '@/contexts/SupabaseAuthContext';
 
 interface WalkthroughStep {
   id: number;
@@ -60,7 +64,7 @@ const walkthroughSteps: WalkthroughStep[] = [
   {
     id: 5,
     title: "Install & Settings ⚙️",
-    content: "Maximize your experience:\n• Install the app from Settings → Install App\n• Configure admin access for security\n• Set cashier dialog preferences\n• Switch between light/dark themes\n• Manage account settings\n\nReady to start selling? 🚀",
+    content: "Maximize your experience:\n• Install the app from Settings → Install App\n• Configure admin access for security\n• Set cashier dialog preferences\n• Switch between light/dark themes\n• Manage account settings",
     icon: Settings,
     position: 'center',
     style: 'gradient'
@@ -75,6 +79,7 @@ interface AppWalkthroughProps {
 const AppWalkthrough: React.FC<AppWalkthroughProps> = ({ open, onOpenChange }) => {
   const [currentStep, setCurrentStep] = useState(0);
   const [isTransitioning, setIsTransitioning] = useState(false);
+  const { isAuthenticatedUser } = useAuth();
 
   const currentStepData = walkthroughSteps[currentStep];
 
@@ -175,6 +180,33 @@ const AppWalkthrough: React.FC<AppWalkthroughProps> = ({ open, onOpenChange }) =
               <p className="text-sm text-foreground leading-relaxed whitespace-pre-line">
                 {currentStepData.content}
               </p>
+              
+              {/* Auth Action - Show in last step only */}
+              {currentStep === walkthroughSteps.length - 1 && (
+                <div className="mt-6 p-4 bg-gradient-to-r from-primary/5 to-primary/10 border border-primary/20 rounded-xl">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-2">
+                      <div className="w-2 h-2 bg-primary rounded-full animate-pulse"></div>
+                      <span className="text-sm font-medium text-foreground">Ready to start selling?</span>
+                    </div>
+                    {isAuthenticatedUser ? (
+                      <div className="flex items-center px-3 py-2 bg-emerald-500/10 border border-emerald-500/30 rounded-lg">
+                        <UserCheck className="w-4 h-4 mr-2 text-emerald-600 dark:text-emerald-400" />
+                        <span className="text-sm font-semibold text-emerald-700 dark:text-emerald-300">
+                          All set!
+                        </span>
+                      </div>
+                    ) : (
+                      <Link to="/signup">
+                        <Button variant="default" size="sm" className="bg-primary hover:bg-primary/90 text-primary-foreground shadow-sm">
+                          <LogIn className="w-4 h-4 mr-2" />
+                          Sign Up Now
+                        </Button>
+                      </Link>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Progress */}
@@ -221,7 +253,7 @@ const AppWalkthrough: React.FC<AppWalkthroughProps> = ({ open, onOpenChange }) =
                 {currentStep === walkthroughSteps.length - 1 ? (
                   <>
                     <CheckCircle className="w-4 h-4 mr-1" />
-                    Get Started
+                    Continue
                   </>
                 ) : (
                   <>
@@ -231,6 +263,7 @@ const AppWalkthrough: React.FC<AppWalkthroughProps> = ({ open, onOpenChange }) =
                 )}
               </Button>
             </div>
+
           </CardContent>
         </Card>
       </div>
