@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { format, isToday, isThisWeek, isThisMonth } from 'date-fns';
 import { History as HistoryIcon, Receipt, CreditCard, Banknote, Smartphone, Calendar, User, Phone, Activity, Plus, Edit, Trash, LogIn, LogOut, Settings, ShieldCheck, ShieldX } from 'lucide-react';
@@ -18,43 +18,8 @@ const History: React.FC = () => {
   const [selectedPeriod, setSelectedPeriod] = useState<'today' | 'week' | 'month' | 'all'>('all');
   const [selectedTab, setSelectedTab] = useState<'transactions' | 'activities'>('transactions');
   const [dataLoading, setDataLoading] = useState(false);
-
-  // Always load all data when component mounts - ensures history shows all past records
-  useEffect(() => {
-    if (!loading) {
-      setDataLoading(true);
-      Promise.all([
-        loadTransactions(), // Always load all transactions
-        loadActivities()    // Always load all activities  
-      ]).finally(() => setDataLoading(false));
-    }
-  }, []);
-
-  const getPaymentIcon = (method: PaymentMethod) => {
-    switch (method) {
-      case 'cash':
-        return <Banknote className="w-4 h-4" />;
-      case 'pos':
-        return <CreditCard className="w-4 h-4" />;
-      case 'transfer':
-        return <Smartphone className="w-4 h-4" />;
-      default:
-        return <Receipt className="w-4 h-4" />;
-    }
-  };
-
-  const getPaymentColor = (method: PaymentMethod) => {
-    switch (method) {
-      case 'cash':
-        return 'bg-green-500/20 text-green-400 border-green-500/30';
-      case 'pos':
-        return 'bg-blue-500/20 text-blue-400 border-blue-500/30';
-      case 'transfer':
-        return 'bg-purple-500/20 text-purple-400 border-purple-500/30';
-      default:
-        return 'bg-gray-500/20 text-gray-400 border-gray-500/30';
-    }
-  };
+  const [isTotalSalesTruncated, setIsTotalSalesTruncated] = useState(false);
+  const totalSalesRef = useRef<HTMLParagraphElement>(null);
 
   // Filter data based on selected period
   const filteredTransactions = useMemo(() => {
@@ -94,6 +59,58 @@ const History: React.FC = () => {
   const totalRevenue = filteredTransactions.reduce((sum, transaction) => sum + transaction.total, 0);
   const totalTransactions = filteredTransactions.length;
 
+  // Check for text truncation
+  useEffect(() => {
+    const checkTruncation = () => {
+      if (totalSalesRef.current) {
+        const element = totalSalesRef.current;
+        setIsTotalSalesTruncated(element.scrollWidth > element.clientWidth);
+      }
+    };
+
+    checkTruncation();
+    window.addEventListener('resize', checkTruncation);
+    
+    return () => window.removeEventListener('resize', checkTruncation);
+  }, [totalRevenue]);
+
+  // Always load all data when component mounts - ensures history shows all past records
+  useEffect(() => {
+    if (!loading) {
+      setDataLoading(true);
+      Promise.all([
+        loadTransactions(), // Always load all transactions
+        loadActivities()    // Always load all activities  
+      ]).finally(() => setDataLoading(false));
+    }
+  }, []);
+
+  const getPaymentIcon = (method: PaymentMethod) => {
+    switch (method) {
+      case 'cash':
+        return <Banknote className="w-4 h-4" />;
+      case 'pos':
+        return <CreditCard className="w-4 h-4" />;
+      case 'transfer':
+        return <Smartphone className="w-4 h-4" />;
+      default:
+        return <Receipt className="w-4 h-4" />;
+    }
+  };
+
+  const getPaymentColor = (method: PaymentMethod) => {
+    switch (method) {
+      case 'cash':
+        return 'bg-green-500/20 text-green-400 border-green-500/30';
+      case 'pos':
+        return 'bg-blue-500/20 text-blue-400 border-blue-500/30';
+      case 'transfer':
+        return 'bg-purple-500/20 text-purple-400 border-purple-500/30';
+      default:
+        return 'bg-gray-500/20 text-gray-400 border-gray-500/30';
+    }
+  };
+
   const getActivityIcon = (type: string) => {
     switch (type) {
       case 'product_added':
@@ -112,12 +129,18 @@ const History: React.FC = () => {
         return <LogOut className="w-4 h-4" />;
       case 'admin_signin':
         return <ShieldCheck className="w-4 h-4" />;
+      case 'admin_signin_failed':
+        return <ShieldX className="w-4 h-4" />;
       case 'admin_signout':
         return <ShieldX className="w-4 h-4" />;
       case 'admin_settings_changed':
         return <Settings className="w-4 h-4" />;
       case 'admin_pin_reset':
         return <ShieldCheck className="w-4 h-4" />;
+      case 'admin_pin_reset_failed':
+        return <ShieldX className="w-4 h-4" />;
+      case 'security_question_updated':
+        return <Settings className="w-4 h-4" />;
       case 'cashier_mode_changed':
         return <Settings className="w-4 h-4" />;
       case 'cashier_added':
@@ -129,6 +152,12 @@ const History: React.FC = () => {
       case 'category_edited':
         return <Edit className="w-4 h-4" />;
       case 'category_deleted':
+        return <Trash className="w-4 h-4" />;
+      case 'admin_setup':
+      case 'admin_initialized':
+        return <ShieldCheck className="w-4 h-4" />;
+      case 'data_cleared':
+      case 'system_reset':
         return <Trash className="w-4 h-4" />;
       default:
         return <Activity className="w-4 h-4" />;
@@ -153,12 +182,18 @@ const History: React.FC = () => {
         return 'bg-amber-500/20 text-amber-400 border-amber-500/30';
       case 'admin_signin':
         return 'bg-indigo-500/20 text-indigo-400 border-indigo-500/30';
+      case 'admin_signin_failed':
+        return 'bg-red-500/20 text-red-400 border-red-500/30';
       case 'admin_signout':
         return 'bg-rose-500/20 text-rose-400 border-rose-500/30';
       case 'admin_settings_changed':
         return 'bg-violet-500/20 text-violet-400 border-violet-500/30';
       case 'admin_pin_reset':
         return 'bg-cyan-500/20 text-cyan-400 border-cyan-500/30';
+      case 'admin_pin_reset_failed':
+        return 'bg-red-500/20 text-red-400 border-red-500/30';
+      case 'security_question_updated':
+        return 'bg-violet-500/20 text-violet-400 border-violet-500/30';
       case 'cashier_mode_changed':
         return 'bg-orange-500/20 text-orange-400 border-orange-500/30';
       case 'cashier_added':
@@ -170,6 +205,12 @@ const History: React.FC = () => {
       case 'category_edited':
         return 'bg-blue-500/20 text-blue-400 border-blue-500/30';
       case 'category_deleted':
+        return 'bg-red-500/20 text-red-400 border-red-500/30';
+      case 'admin_setup':
+      case 'admin_initialized':
+        return 'bg-indigo-500/20 text-indigo-400 border-indigo-500/30';
+      case 'data_cleared':
+      case 'system_reset':
         return 'bg-red-500/20 text-red-400 border-red-500/30';
       default:
         return 'bg-gray-500/20 text-gray-400 border-gray-500/30';
@@ -201,10 +242,13 @@ const History: React.FC = () => {
                 <div className="flex-1 min-w-0">
                   <p className="text-sm text-muted-foreground">Total Sales</p>
                   <div className="flex items-center space-x-2">
-                    <p className="text-lg font-bold text-foreground truncate">
+                    <p 
+                      ref={totalSalesRef}
+                      className="text-lg font-bold text-foreground truncate"
+                    >
                       ₦{totalRevenue.toLocaleString()}
                     </p>
-                    {totalRevenue.toLocaleString().length > 10 && (
+                    {isTotalSalesTruncated && (
                       <Popover>
                         <PopoverTrigger asChild>
                           <Button variant="ghost" size="sm" className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground">

@@ -44,33 +44,54 @@ export type Database = {
       admin_settings: {
         Row: {
           admin_email: string
+          cashier_signin_mode: string | null
           created_at: string
           device_cache_enabled: boolean | null
+          disable_cashier_dialog: boolean | null
           id: string
+          managed_cashiers: Json | null
           owner_user_id: string
           pin_hash: string
+          require_admin_for_product_actions: boolean | null
           require_cashier_for_all_actions: boolean | null
+          security_answer_hash: string | null
+          security_question: string | null
           updated_at: string
+          whatsapp_number: string | null
         }
         Insert: {
           admin_email: string
+          cashier_signin_mode?: string | null
           created_at?: string
           device_cache_enabled?: boolean | null
+          disable_cashier_dialog?: boolean | null
           id?: string
+          managed_cashiers?: Json | null
           owner_user_id: string
           pin_hash: string
+          require_admin_for_product_actions?: boolean | null
           require_cashier_for_all_actions?: boolean | null
+          security_answer_hash?: string | null
+          security_question?: string | null
           updated_at?: string
+          whatsapp_number?: string | null
         }
         Update: {
           admin_email?: string
+          cashier_signin_mode?: string | null
           created_at?: string
           device_cache_enabled?: boolean | null
+          disable_cashier_dialog?: boolean | null
           id?: string
+          managed_cashiers?: Json | null
           owner_user_id?: string
           pin_hash?: string
+          require_admin_for_product_actions?: boolean | null
           require_cashier_for_all_actions?: boolean | null
+          security_answer_hash?: string | null
+          security_question?: string | null
           updated_at?: string
+          whatsapp_number?: string | null
         }
         Relationships: []
       }
@@ -94,6 +115,72 @@ export type Database = {
           id?: string
           name?: string
           updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      otp_codes: {
+        Row: {
+          code: string
+          created_at: string
+          email: string
+          expires_at: string
+          id: string
+          type: string
+          used: boolean | null
+          used_at: string | null
+          user_id: string
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          email: string
+          expires_at: string
+          id?: string
+          type?: string
+          used?: boolean | null
+          used_at?: string | null
+          user_id: string
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          email?: string
+          expires_at?: string
+          id?: string
+          type?: string
+          used?: boolean | null
+          used_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      pin_reset_attempts: {
+        Row: {
+          admin_email: string
+          attempts: number
+          created_at: string
+          id: string
+          last_attempt_at: string
+          locked_until: string | null
+          user_id: string
+        }
+        Insert: {
+          admin_email: string
+          attempts?: number
+          created_at?: string
+          id?: string
+          last_attempt_at?: string
+          locked_until?: string | null
+          user_id: string
+        }
+        Update: {
+          admin_email?: string
+          attempts?: number
+          created_at?: string
+          id?: string
+          last_attempt_at?: string
+          locked_until?: string | null
           user_id?: string
         }
         Relationships: []
@@ -207,6 +294,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      clear_user_data: {
+        Args: { target_user_id: string }
+        Returns: Json
+      }
       clone_demo_data_for_user: {
         Args: { target_user_id: string }
         Returns: undefined

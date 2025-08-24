@@ -22,11 +22,11 @@ serve(async (req) => {
       }
     )
 
-    const { email, otp } = await req.json()
+    const { email, whatsappNumber, otp } = await req.json()
 
-    if (!email || !otp) {
+    if ((!email && !whatsappNumber) || !otp) {
       return new Response(
-        JSON.stringify({ error: 'Email and OTP are required' }),
+        JSON.stringify({ error: 'Email or WhatsApp number and OTP are required' }),
         { 
           status: 400, 
           headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
@@ -34,15 +34,22 @@ serve(async (req) => {
       )
     }
 
-    // Find valid OTP
-    const { data: otpData, error: otpError } = await supabaseClient
+    // Build query based on whether we have email or WhatsApp number
+    let query = supabaseClient
       .from('otp_codes')
       .select('*')
-      .eq('email', email)
-      .eq('code', otp) // Fixed: changed from otp_code to code
+      .eq('code', otp)
       .eq('used', false)
-      .gt('expires_at', new Date().toISOString())
-      .single()
+      .gt('expires_at', new Date().toISOString());
+
+    if (email) {
+      query = query.eq('email', email);
+    } else {
+      query = query.eq('whatsapp_number', whatsappNumber);
+    }
+
+    // Find valid OTP
+    const { data: otpData, error: otpError } = await query.single()
 
     if (otpError || !otpData) {
       return new Response(
@@ -71,6 +78,7 @@ serve(async (req) => {
       JSON.stringify({ 
         success: true,
         verified: true,
+        otp_id: otpData.id,
         message: 'OTP verified successfully'
       }),
       { 

@@ -16,16 +16,20 @@ import {
   Mail,
   Download,
   Smartphone,
-  HelpCircle
+  HelpCircle,
+  Phone,
+  Shield,
+  X
 } from 'lucide-react';
 import { useAuth } from '@/contexts/SupabaseAuthContext';
 import { useProducts } from '@/contexts/SupabaseProductContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useAdmin } from '@/contexts/AdminContext';
+import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import Layout from '@/components/Layout';
 import CategoryManager from '@/components/CategoryManager';
 import CashierManagement from '@/components/CashierManagement';
@@ -34,6 +38,11 @@ import AdminSetupDialog from '@/components/AdminSetupDialog';
 import AdminSignInDialog from '@/components/AdminSignInDialog';
 import ForgotPinDialog from '@/components/ForgotPinDialog';
 import AppWalkthrough from '@/components/AppWalkthrough';
+import SecurityQuestionDialog from '@/components/SecurityQuestionDialog';
+import SecurityWarning from '@/components/SecurityWarning';
+import ClearDataDialog from '@/components/ClearDataDialog';
+import FAQSection from '@/components/FAQSection';
+
 
 interface BeforeInstallPromptEvent extends Event {
   prompt(): Promise<void>;
@@ -45,12 +54,14 @@ const Settings: React.FC = () => {
   const { user, logout } = useAuth();
   const { products, deleteProduct, loading, loadProducts } = useProducts();
   const { theme, toggleTheme } = useTheme();
+  const { toast } = useToast();
   const { 
     isAdminMode, 
     adminSettings, 
     signOutAdmin, 
     toggleCashierDialogDisabled,
     toggleAdminProductRequirement,
+    loadAdminSettings,
     loading: adminLoading 
   } = useAdmin();
   const [deletingProductId, setDeletingProductId] = useState<string | null>(null);
@@ -61,6 +72,11 @@ const Settings: React.FC = () => {
   const [showAdminSignIn, setShowAdminSignIn] = useState(false);
   const [showForgotPin, setShowForgotPin] = useState(false);
   const [showWalkthrough, setShowWalkthrough] = useState(false);
+  const [showSecurityDialog, setShowSecurityDialog] = useState(false);
+  const [showSecurityWarningDialog, setShowSecurityWarningDialog] = useState(false);
+  const [showClearDataDialog, setShowClearDataDialog] = useState(false);
+  const [justSignedInAsAdmin, setJustSignedInAsAdmin] = useState(false);
+  
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const [isInstalled, setIsInstalled] = useState(false);
   const [installing, setInstalling] = useState(false);
@@ -72,6 +88,14 @@ const Settings: React.FC = () => {
     }
   }, [user, products.length, loading, loadProducts]);
 
+  // Check for security warning after admin sign in
+  useEffect(() => {
+    if (justSignedInAsAdmin && isAdminMode && adminSettings && !adminSettings.hasSecurityQuestion) {
+      setShowSecurityWarningDialog(true);
+      setJustSignedInAsAdmin(false);
+    }
+  }, [justSignedInAsAdmin, isAdminMode, adminSettings]);
+
   // PWA Install functionality
   useEffect(() => {
     // Check if app is already installed
@@ -79,11 +103,37 @@ const Settings: React.FC = () => {
       if (window.matchMedia('(display-mode: standalone)').matches || 
           (window.navigator as any).standalone === true) {
         setIsInstalled(true);
-        return;
+        return true;
       }
+      return false;
     };
 
-    checkInstalled();
+    const isAlreadyInstalled = checkInstalled();
+    
+    // If not installed, check if PWA is installable
+    if (!isAlreadyInstalled) {
+      // Check if beforeinstallprompt has already fired
+      const checkForDeferredPrompt = () => {
+        // Some browsers may support installation but don't fire beforeinstallprompt immediately
+        // We'll show install option if the browser supports it
+        if ('serviceWorker' in navigator && 'BeforeInstallPromptEvent' in window) {
+          // Set a timeout to check if prompt is available
+          setTimeout(() => {
+            if (!deferredPrompt && !isInstalled) {
+              // If no prompt after delay, assume installable for PWA-capable browsers
+              const isHttps = window.location.protocol === 'https:';
+              const isLocalhost = window.location.hostname === 'localhost';
+              if (isHttps || isLocalhost) {
+                // Create a mock prompt for browsers that support PWA but don't fire the event immediately
+                setDeferredPrompt({} as BeforeInstallPromptEvent);
+              }
+            }
+          }, 2000);
+        }
+      };
+      
+      checkForDeferredPrompt();
+    }
 
     // Listen for the beforeinstallprompt event
     const handleBeforeInstallPrompt = (e: Event) => {
@@ -155,16 +205,31 @@ const Settings: React.FC = () => {
 
     setInstalling(true);
     try {
-      await deferredPrompt.prompt();
-      const choiceResult = await deferredPrompt.userChoice;
-      
-      if (choiceResult.outcome === 'accepted') {
-        setIsInstalled(true);
+      // Check if it's a mock prompt or real prompt
+      if (typeof deferredPrompt.prompt === 'function') {
+        await deferredPrompt.prompt();
+        const choiceResult = await deferredPrompt.userChoice;
+        
+        if (choiceResult.outcome === 'accepted') {
+          setIsInstalled(true);
+        }
+      } else {
+        // For browsers that support PWA but don't have the prompt API
+        // Show a fallback message or try alternative installation methods
+        toast({
+          title: "Install App",
+          description: "To install this app, use your browser's menu to 'Add to Home Screen' or 'Install App'.",
+        });
       }
       
       setDeferredPrompt(null);
     } catch (error) {
       console.error('Error installing PWA:', error);
+      toast({
+        title: "Installation Error",
+        description: "Unable to install the app. Try using your browser's 'Add to Home Screen' option.",
+        variant: "destructive",
+      });
     } finally {
       setInstalling(false);
     }
@@ -357,7 +422,7 @@ const Settings: React.FC = () => {
                   </Button>
                 </div>
               ) : (
-                <div className="space-y-4">
+                 <div className="space-y-4">
                   <div className="p-3 bg-primary/10 border border-primary/20 rounded-lg">
                     <p className="text-sm text-primary font-medium">
                       🔐 Admin Mode Active
@@ -366,6 +431,14 @@ const Settings: React.FC = () => {
                       You have administrative privileges
                     </p>
                   </div>
+
+                  {/* Security Warning - Show when no security question is set */}
+                  {!adminSettings.hasSecurityQuestion && (
+                    <SecurityWarning 
+                      onSetupSecurity={() => setShowSecurityDialog(true)}
+                      variant="inline"
+                    />
+                  )}
                   
                   <div className="space-y-3">
                     <div className="flex items-center justify-between">
@@ -405,6 +478,48 @@ const Settings: React.FC = () => {
                         {adminSettings.requireAdminForProductActions ? "Enabled" : "Disabled"}
                       </Button>
                     </div>
+                  </div>
+
+                  <Separator className="bg-border" />
+
+                  {/* Clear Data Section - Admin Only */}
+                  <div className="space-y-3">
+                    <div className="p-3 bg-destructive/10 border border-destructive/20 rounded-lg">
+                      <div className="flex items-start space-x-3">
+                        <Trash2 className="w-5 h-5 text-destructive flex-shrink-0 mt-0.5" />
+                        <div className="space-y-2 flex-1">
+                          <div>
+                            <p className="text-sm font-medium text-destructive">Danger Zone</p>
+                            <p className="text-xs text-muted-foreground">
+                              Permanently delete all your data from QuikShopping
+                            </p>
+                          </div>
+                          <Button
+                            variant="destructive"
+                            size="sm"
+                            onClick={() => setShowClearDataDialog(true)}
+                            className="w-full sm:w-auto"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                            Clear All Data
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <Separator className="bg-border" />
+
+                  <div className="space-y-3">
+                    <Button
+                      variant="outline"
+                      onClick={() => setShowSecurityDialog(true)}
+                      className="w-full justify-start"
+                      disabled={adminLoading}
+                    >
+                      <Shield className="w-4 h-4" />
+                      {adminSettings.hasSecurityQuestion ? 'Manage Security Question' : 'Set Security Question'}
+                    </Button>
                   </div>
 
                   <Separator className="bg-border" />
@@ -547,6 +662,9 @@ const Settings: React.FC = () => {
           </CardContent>
         </Card>
 
+        {/* FAQ Section */}
+        <FAQSection />
+
         {/* Cashier Dialog - Only show if dialog is not disabled */}
         {!adminSettings?.disableCashierDialog && (
           <EnhancedCashierDialog
@@ -572,6 +690,9 @@ const Settings: React.FC = () => {
             setShowAdminSignIn(false);
             setShowForgotPin(true);
           }}
+          onSuccessfulSignIn={() => {
+            setJustSignedInAsAdmin(true);
+          }}
         />
         
         <ForgotPinDialog
@@ -588,6 +709,46 @@ const Settings: React.FC = () => {
           open={showWalkthrough} 
           onOpenChange={setShowWalkthrough} 
         />
+
+        {/* Security Question Dialog */}
+        <SecurityQuestionDialog
+          open={showSecurityDialog}
+          onOpenChange={setShowSecurityDialog}
+          onSuccess={() => {
+            loadAdminSettings(); // Refresh admin settings after security question is set
+          }}
+        />
+
+        {/* Security Warning Dialog */}
+        <AlertDialog open={showSecurityWarningDialog} onOpenChange={setShowSecurityWarningDialog}>
+          <AlertDialogContent className="bg-card border-border max-w-md mx-auto">
+            <AlertDialogHeader className="relative">
+              <button
+                onClick={() => setShowSecurityWarningDialog(false)}
+                className="absolute right-0 top-0 p-2 rounded-sm opacity-70 hover:opacity-100 transition-opacity"
+              >
+                <X className="h-4 w-4" />
+                <span className="sr-only">Close</span>
+              </button>
+            </AlertDialogHeader>
+            <div className="flex justify-center py-4">
+              <SecurityWarning 
+                onSetupSecurity={() => {
+                  setShowSecurityWarningDialog(false);
+                  setShowSecurityDialog(true);
+                }}
+                variant="dialog"
+              />
+            </div>
+          </AlertDialogContent>
+        </AlertDialog>
+
+        {/* Clear Data Dialog */}
+        <ClearDataDialog
+          open={showClearDataDialog}
+          onOpenChange={setShowClearDataDialog}
+        />
+
       </div>
     </Layout>
   );

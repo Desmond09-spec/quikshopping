@@ -3,8 +3,10 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
-import { Shield, Eye, EyeOff, Mail, Lock } from 'lucide-react';
+import { Shield, Eye, EyeOff, Mail, Lock, Phone } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useAdmin } from '@/contexts/AdminContext';
+import { formatPhoneNumber, validatePhoneNumber } from '@/lib/phoneUtils';
 
 interface AdminSetupDialogProps {
   open: boolean;
@@ -18,9 +20,13 @@ const AdminSetupDialog: React.FC<AdminSetupDialogProps> = ({
   const { setupAdmin, loading } = useAdmin();
   const [formData, setFormData] = useState({
     adminEmail: '',
+    whatsappNumber: '',
     pin: '',
-    confirmPin: ''
+    confirmPin: '',
+    securityQuestion: '',
+    securityAnswer: ''
   });
+  const [customQuestion, setCustomQuestion] = useState('');
   const [showPin, setShowPin] = useState(false);
   const [showConfirmPin, setShowConfirmPin] = useState(false);
   const [error, setError] = useState('');
@@ -29,7 +35,9 @@ const AdminSetupDialog: React.FC<AdminSetupDialogProps> = ({
     e.preventDefault();
     setError('');
 
-    if (!formData.adminEmail || !formData.pin || !formData.confirmPin) {
+    const finalSecurityQuestion = formData.securityQuestion === 'custom' ? customQuestion : formData.securityQuestion;
+    
+    if (!formData.adminEmail || !formData.whatsappNumber || !formData.pin || !formData.confirmPin || !finalSecurityQuestion || !formData.securityAnswer) {
       setError('All fields are required');
       return;
     }
@@ -49,9 +57,16 @@ const AdminSetupDialog: React.FC<AdminSetupDialogProps> = ({
       return;
     }
 
+    if (!validatePhoneNumber(formData.whatsappNumber)) {
+      setError('Please enter a valid WhatsApp number (e.g., 09012345678)');
+      return;
+    }
+
     try {
-      await setupAdmin(formData.adminEmail, formData.pin, formData.confirmPin);
-      setFormData({ adminEmail: '', pin: '', confirmPin: '' });
+      const formattedNumber = formatPhoneNumber(formData.whatsappNumber);
+      await setupAdmin(formData.adminEmail, formattedNumber, formData.pin, formData.confirmPin, finalSecurityQuestion, formData.securityAnswer);
+      setFormData({ adminEmail: '', whatsappNumber: '', pin: '', confirmPin: '', securityQuestion: '', securityAnswer: '' });
+      setCustomQuestion('');
       onOpenChange(false);
     } catch (error: any) {
       setError(error.message || 'Failed to setup admin');
@@ -60,7 +75,8 @@ const AdminSetupDialog: React.FC<AdminSetupDialogProps> = ({
 
   const handleOpenChange = (newOpen: boolean) => {
     if (!newOpen) {
-      setFormData({ adminEmail: '', pin: '', confirmPin: '' });
+      setFormData({ adminEmail: '', whatsappNumber: '', pin: '', confirmPin: '', securityQuestion: '', securityAnswer: '' });
+      setCustomQuestion('');
       setError('');
       setShowPin(false);
       setShowConfirmPin(false);
@@ -87,7 +103,7 @@ const AdminSetupDialog: React.FC<AdminSetupDialogProps> = ({
             </div>
             <div>
               <DialogTitle className="text-foreground">Setup Admin Access</DialogTitle>
-              <p className="text-sm text-muted-foreground">Configure admin email and PIN</p>
+              <p className="text-sm text-muted-foreground">Configure admin email, security question and PIN</p>
             </div>
           </div>
         </DialogHeader>
@@ -102,7 +118,7 @@ const AdminSetupDialog: React.FC<AdminSetupDialogProps> = ({
           <div className="space-y-2">
             <Label htmlFor="adminEmail" className="text-foreground flex items-center space-x-2">
               <Mail className="w-4 h-4" />
-              <span>Admin Email (for OTP fallback)</span>
+              <span>Admin Email</span>
             </Label>
             <Input
               id="adminEmail"
@@ -114,7 +130,25 @@ const AdminSetupDialog: React.FC<AdminSetupDialogProps> = ({
               autoFocus
             />
             <p className="text-xs text-muted-foreground">
-              This email will be used for password reset via OTP
+              This email will be used for admin notifications and PIN recovery
+            </p>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="whatsappNumber" className="text-foreground flex items-center space-x-2">
+              <Phone className="w-4 h-4" />
+              <span>WhatsApp Number</span>
+            </Label>
+            <Input
+              id="whatsappNumber"
+              type="tel"
+              value={formData.whatsappNumber}
+              onChange={(e) => setFormData(prev => ({ ...prev, whatsappNumber: e.target.value }))}
+              placeholder="09012345678 or +2349012345678"
+              required
+            />
+            <p className="text-xs text-muted-foreground">
+              Enter your WhatsApp number (e.g., 09012345678) for notifications and recovery
             </p>
           </div>
 
@@ -194,6 +228,56 @@ const AdminSetupDialog: React.FC<AdminSetupDialogProps> = ({
             )}
           </div>
 
+          <div className="space-y-2">
+            <Label htmlFor="securityQuestion" className="text-foreground flex items-center space-x-2">
+              <Lock className="w-4 h-4" />
+              <span>Security Question</span>
+            </Label>
+            <Select
+              value={formData.securityQuestion}
+              onValueChange={(value) => setFormData(prev => ({ ...prev, securityQuestion: value }))}
+              required
+            >
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Select a security question..." />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="mother_maiden_name">What is your mother's maiden name?</SelectItem>
+                <SelectItem value="first_pet_name">What was the name of your first pet?</SelectItem>
+                <SelectItem value="elementary_school">What elementary school did you attend?</SelectItem>
+                <SelectItem value="childhood_friend">What is the name of your childhood best friend?</SelectItem>
+                <SelectItem value="birth_city">What city were you born in?</SelectItem>
+                <SelectItem value="favorite_teacher">Who was your favorite teacher?</SelectItem>
+                <SelectItem value="business_registration">What year was your business registered?</SelectItem>
+                <SelectItem value="custom">Custom question (enter below)</SelectItem>
+              </SelectContent>
+            </Select>
+            {formData.securityQuestion === 'custom' && (
+              <Input
+                type="text"
+                value={customQuestion}
+                onChange={(e) => setCustomQuestion(e.target.value)}
+                placeholder="Enter your custom security question"
+                required
+              />
+            )}
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="securityAnswer" className="text-foreground">Security Answer</Label>
+            <Input
+              id="securityAnswer"
+              type="text"
+              value={formData.securityAnswer}
+              onChange={(e) => setFormData(prev => ({ ...prev, securityAnswer: e.target.value }))}
+              placeholder="Enter your answer"
+              required
+            />
+            <p className="text-xs text-muted-foreground">
+              This answer will be used to verify your identity when resetting your PIN
+            </p>
+          </div>
+
           <div className="flex space-x-3 pt-4">
             <Button 
               type="button"
@@ -208,7 +292,7 @@ const AdminSetupDialog: React.FC<AdminSetupDialogProps> = ({
               type="submit"
               variant="default"
               className="flex-1"
-              disabled={loading || formData.pin !== formData.confirmPin || formData.pin.length < 4}
+              disabled={loading || formData.pin !== formData.confirmPin || formData.pin.length < 4 || !formData.whatsappNumber || (!formData.securityQuestion || (formData.securityQuestion === 'custom' && !customQuestion)) || !formData.securityAnswer}
             >
               {loading ? (
                 <div className="flex items-center space-x-2">

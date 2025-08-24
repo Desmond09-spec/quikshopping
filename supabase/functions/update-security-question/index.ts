@@ -46,11 +46,11 @@ serve(async (req) => {
       )
     }
 
-    const { adminEmail, whatsappNumber, pin, securityQuestion, securityAnswer } = await req.json()
+    const { currentPin, securityQuestion, securityAnswer } = await req.json()
 
-    if (!adminEmail || !whatsappNumber || !pin || !securityQuestion || !securityAnswer) {
+    if (!currentPin || !securityQuestion || !securityAnswer) {
       return new Response(
-        JSON.stringify({ error: 'All fields are required' }),
+        JSON.stringify({ error: 'Current PIN, security question and answer are required' }),
         { 
           status: 400, 
           headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
@@ -58,8 +58,8 @@ serve(async (req) => {
       )
     }
 
-    // Validate PIN (at least 4 digits)
-    if (!/^\d{4,}$/.test(pin)) {
+    // Validate PIN format
+    if (!/^\d{4,}$/.test(currentPin)) {
       return new Response(
         JSON.stringify({ error: 'PIN must be at least 4 digits' }),
         { 
@@ -69,28 +69,53 @@ serve(async (req) => {
       )
     }
 
-    // Hash the PIN and security answer
-    const pinHash = await hashPassword(pin)
+    // Get admin settings
+    const { data: adminSettings, error: settingsError } = await supabaseClient
+      .from('admin_settings')
+      .select('*')
+      .eq('owner_user_id', user.id)
+      .single()
+
+    if (settingsError || !adminSettings) {
+      console.log('Admin settings not found for user:', user.id, settingsError)
+      return new Response(
+        JSON.stringify({ error: 'Admin not configured' }),
+        { 
+          status: 404, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      )
+    }
+
+    // Verify current PIN
+    const currentPinHash = await hashPassword(currentPin)
+    if (adminSettings.pin_hash !== currentPinHash) {
+      console.log('Invalid PIN for user:', user.id)
+      return new Response(
+        JSON.stringify({ error: 'Invalid current PIN' }),
+        { 
+          status: 403, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      )
+    }
+
+    // Hash the new security answer
     const securityAnswerHash = await hashPassword(securityAnswer.toLowerCase().trim())
 
-    // Insert admin settings
-    const { data, error } = await supabaseClient
+    // Update admin settings with new security question and answer
+    const { error: updateError } = await supabaseClient
       .from('admin_settings')
-      .insert({
-        owner_user_id: user.id,
-        admin_email: adminEmail,
-        whatsapp_number: whatsappNumber,
-        pin_hash: pinHash,
+      .update({ 
         security_question: securityQuestion,
         security_answer_hash: securityAnswerHash
       })
-      .select()
-      .single()
+      .eq('owner_user_id', user.id)
 
-    if (error) {
-      console.error('Error creating admin settings:', error)
+    if (updateError) {
+      console.log('Failed to update security question:', updateError)
       return new Response(
-        JSON.stringify({ error: 'Failed to setup admin' }),
+        JSON.stringify({ error: 'Failed to update security question' }),
         { 
           status: 500, 
           headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
@@ -98,20 +123,19 @@ serve(async (req) => {
       )
     }
 
-    // Log the admin setup activity
+    // Log security question update activity
     await supabaseClient.from('activities').insert({
       user_id: user.id,
-      type: 'admin_setup',
-      description: 'Admin settings configured',
+      type: 'security_question_updated',
+      description: 'Security question updated',
       details: {
-        adminEmail: adminEmail,
-        whatsappNumber: whatsappNumber,
-        setupDate: new Date().toISOString()
+        adminEmail: adminSettings.admin_email,
+        updateTime: new Date().toISOString()
       }
     })
 
     return new Response(
-      JSON.stringify({ success: true, message: 'Admin setup completed' }),
+      JSON.stringify({ success: true, message: 'Security question updated successfully' }),
       { 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
       }

@@ -46,17 +46,11 @@ serve(async (req) => {
       )
     }
 
-    const { newPin, email, whatsappNumber, otp_id } = await req.json()
+    const { adminEmail, securityAnswer, newPin } = await req.json()
 
-    if (!newPin || (!email && !whatsappNumber) || !otp_id) {
-      console.log('Missing required parameters:', { 
-        newPin: !!newPin, 
-        email: !!email, 
-        whatsappNumber: !!whatsappNumber, 
-        otp_id: !!otp_id 
-      })
+    if (!adminEmail || !securityAnswer || !newPin) {
       return new Response(
-        JSON.stringify({ error: 'New PIN, email or WhatsApp number, and OTP ID are required' }),
+        JSON.stringify({ error: 'Admin email, security answer, and new PIN are required' }),
         { 
           status: 400, 
           headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
@@ -93,9 +87,9 @@ serve(async (req) => {
       )
     }
 
-    // Verify the email or WhatsApp number matches the admin settings
-    if (email && adminSettings.admin_email !== email) {
-      console.log('Email mismatch:', { adminEmail: adminSettings.admin_email, providedEmail: email })
+    // Verify the email matches the admin settings
+    if (adminSettings.admin_email !== adminEmail) {
+      console.log('Email mismatch:', { adminEmail: adminSettings.admin_email, providedEmail: adminEmail })
       return new Response(
         JSON.stringify({ error: 'Email does not match admin email' }),
         { 
@@ -105,49 +99,81 @@ serve(async (req) => {
       )
     }
 
-    if (whatsappNumber && adminSettings.whatsapp_number !== whatsappNumber) {
-      console.log('WhatsApp number mismatch:', { 
-        adminWhatsApp: adminSettings.whatsapp_number, 
-        providedWhatsApp: whatsappNumber 
-      })
-      return new Response(
-        JSON.stringify({ error: 'WhatsApp number does not match admin number' }),
-        { 
-          status: 403, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-        }
-      )
-    }
-
-    // Verify the OTP was recently used and belongs to this user
-    let otpQuery = supabaseClient
-      .from('otp_codes')
+    // Check rate limiting
+    const now = new Date()
+    const { data: attempts, error: attemptError } = await supabaseClient
+      .from('pin_reset_attempts')
       .select('*')
-      .eq('id', otp_id)
       .eq('user_id', user.id)
-      .eq('type', 'pin_reset')
-      .eq('used', true)
-      .gt('used_at', new Date(Date.now() - 15 * 60 * 1000).toISOString()); // Used within last 15 minutes
+      .eq('admin_email', adminEmail)
+      .single()
 
-    // Add email or WhatsApp number filter
-    if (email) {
-      otpQuery = otpQuery.eq('email', email);
-    } else if (whatsappNumber) {
-      otpQuery = otpQuery.eq('whatsapp_number', whatsappNumber);
+    if (attempts && attempts.locked_until && new Date(attempts.locked_until) > now) {
+      const remainingTime = Math.ceil((new Date(attempts.locked_until).getTime() - now.getTime()) / 60000)
+      return new Response(
+        JSON.stringify({ 
+          error: `Too many failed attempts. Account locked for ${remainingTime} more minutes.` 
+        }),
+        { 
+          status: 429, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      )
     }
 
-    const { data: otpData, error: otpError } = await otpQuery.single()
+    // Hash the provided security answer
+    const providedAnswerHash = await hashPassword(securityAnswer.toLowerCase().trim())
 
-    if (otpError || !otpData) {
-      console.log('Invalid or expired OTP verification:', { 
-        otp_id, 
-        user_id: user.id, 
-        email, 
-        whatsappNumber, 
-        otpError 
+    // Verify security answer
+    if (adminSettings.security_answer_hash !== providedAnswerHash) {
+      console.log('Security answer mismatch for user:', user.id)
+
+      // Update or create attempt record
+      const newAttemptCount = (attempts?.attempts || 0) + 1
+      const isLocked = newAttemptCount >= 3
+      const lockUntil = isLocked ? new Date(now.getTime() + 15 * 60 * 1000) : null // 15 minutes
+
+      if (attempts) {
+        await supabaseClient
+          .from('pin_reset_attempts')
+          .update({
+            attempts: newAttemptCount,
+            last_attempt_at: now.toISOString(),
+            locked_until: lockUntil?.toISOString() || null
+          })
+          .eq('id', attempts.id)
+      } else {
+        await supabaseClient
+          .from('pin_reset_attempts')
+          .insert({
+            user_id: user.id,
+            admin_email: adminEmail,
+            attempts: newAttemptCount,
+            last_attempt_at: now.toISOString(),
+            locked_until: lockUntil?.toISOString() || null
+          })
+      }
+
+      // Log failed attempt
+      await supabaseClient.from('activities').insert({
+        user_id: user.id,
+        type: 'admin_pin_reset_failed',
+        description: `Failed PIN reset attempt via security question (attempt ${newAttemptCount}/3)`,
+        details: {
+          adminEmail: adminEmail,
+          attemptNumber: newAttemptCount,
+          locked: isLocked,
+          attemptTime: now.toISOString()
+        }
       })
+
+      const remainingAttempts = Math.max(0, 3 - newAttemptCount)
+      const errorMessage = isLocked 
+        ? 'Too many failed attempts. Account locked for 15 minutes.'
+        : `Incorrect security answer. ${remainingAttempts} attempts remaining.`
+
       return new Response(
-        JSON.stringify({ error: 'Invalid or expired OTP verification' }),
+        JSON.stringify({ error: errorMessage }),
         { 
           status: 403, 
           headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
@@ -155,10 +181,10 @@ serve(async (req) => {
       )
     }
 
-    // Hash the new PIN
+    // Security answer is correct, reset the PIN
     const newPinHash = await hashPassword(newPin)
 
-    // Update admin settings
+    // Update admin settings with new PIN
     const { error: updateError } = await supabaseClient
       .from('admin_settings')
       .update({ pin_hash: newPinHash })
@@ -175,21 +201,31 @@ serve(async (req) => {
       )
     }
 
-    // Log PIN reset activity
+    // Clear any existing attempt records
+    if (attempts) {
+      await supabaseClient
+        .from('pin_reset_attempts')
+        .delete()
+        .eq('id', attempts.id)
+    }
+
+    // Log successful PIN reset
     await supabaseClient.from('activities').insert({
       user_id: user.id,
       type: 'admin_pin_reset',
-      description: `Admin PIN reset via ${email ? 'email' : 'WhatsApp'} OTP`,
+      description: 'Admin PIN reset successfully via security question',
       details: {
-        contactMethod: email ? 'email' : 'whatsapp',
-        adminEmail: adminSettings.admin_email,
-        whatsappNumber: adminSettings.whatsapp_number,
-        resetTime: new Date().toISOString()
+        adminEmail: adminEmail,
+        resetTime: now.toISOString(),
+        method: 'security_question'
       }
     })
 
     return new Response(
-      JSON.stringify({ success: true, message: 'PIN reset successfully' }),
+      JSON.stringify({ 
+        success: true, 
+        message: 'PIN reset successfully' 
+      }),
       { 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
       }

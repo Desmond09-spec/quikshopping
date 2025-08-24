@@ -10,12 +10,14 @@ interface AdminSignInDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onForgotPin: () => void;
+  onSuccessfulSignIn?: () => void;
 }
 
 const AdminSignInDialog: React.FC<AdminSignInDialogProps> = ({
   open,
   onOpenChange,
-  onForgotPin
+  onForgotPin,
+  onSuccessfulSignIn
 }) => {
   const { signInAdmin, loading, adminSettings } = useAdmin();
   const [pin, setPin] = useState('');
@@ -40,8 +42,15 @@ const AdminSignInDialog: React.FC<AdminSignInDialogProps> = ({
       await signInAdmin(pin);
       setPin('');
       onOpenChange(false);
+      onSuccessfulSignIn?.();
     } catch (error: any) {
-      setError(error.message || 'Failed to sign in');
+      // Check if it's an invalid PIN error from the edge function
+      const errorMessage = error.message || 'Failed to sign in';
+      if (errorMessage.includes('Invalid PIN') || errorMessage.includes('Edge Function returned a non-2xx status code')) {
+        setError('Incorrect PIN');
+      } else {
+        setError(errorMessage);
+      }
     }
   };
 

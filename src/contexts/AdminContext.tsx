@@ -7,9 +7,11 @@ interface AdminSettings {
   id: string;
   ownerUserId: string;
   adminEmail: string;
+  whatsappNumber?: string;
   deviceCacheEnabled: boolean;
   disableCashierDialog: boolean;
   requireAdminForProductActions: boolean;
+  hasSecurityQuestion: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -26,7 +28,7 @@ interface AdminState {
 }
 
 interface AdminContextType extends AdminState {
-  setupAdmin: (adminEmail: string, pin: string, confirmPin: string) => Promise<void>;
+  setupAdmin: (adminEmail: string, whatsappNumber: string, pin: string, confirmPin: string, securityQuestion: string, securityAnswer: string) => Promise<void>;
   signInAdmin: (pin: string) => Promise<void>;
   signOutAdmin: () => Promise<void>;
   requestPasswordReset: (email: string) => Promise<void>;
@@ -112,9 +114,11 @@ export const AdminProvider: React.FC<{ children: ReactNode }> = ({ children }) =
           id: data.id,
           ownerUserId: data.owner_user_id,
           adminEmail: data.admin_email,
+          whatsappNumber: data.whatsapp_number,
           deviceCacheEnabled: data.device_cache_enabled,
           disableCashierDialog: data.disable_cashier_dialog || false,
           requireAdminForProductActions: data.require_admin_for_product_actions || false,
+          hasSecurityQuestion: !!data.security_question,
           createdAt: data.created_at,
           updatedAt: data.updated_at
         } : null,
@@ -128,7 +132,7 @@ export const AdminProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     }
   };
 
-  const setupAdmin = async (adminEmail: string, pin: string, confirmPin: string) => {
+  const setupAdmin = async (adminEmail: string, whatsappNumber: string, pin: string, confirmPin: string, securityQuestion: string, securityAnswer: string) => {
     if (!user) throw new Error('User not authenticated');
     
     if (pin !== confirmPin) {
@@ -143,7 +147,7 @@ export const AdminProvider: React.FC<{ children: ReactNode }> = ({ children }) =
 
     try {
       const { data, error } = await supabase.functions.invoke('admin-setup', {
-        body: { adminEmail, pin }
+        body: { adminEmail, whatsappNumber, pin, securityQuestion, securityAnswer }
       });
 
       if (error) throw error;

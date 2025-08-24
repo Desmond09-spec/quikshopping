@@ -362,18 +362,25 @@ const Auth: React.FC = () => {
                       type="button"
                       variant="link"
                       onClick={async () => {
+                        setLoading(true);
                         try {
                           await logout();
                           setStep('auth');
                         } catch (error) {
                           console.error('Error logging out:', error);
                           setStep('auth');
+                        } finally {
+                          setLoading(false);
                         }
                       }}
                       disabled={loading}
                       className="text-sm"
                     >
-                      <ArrowLeft className="w-4 h-4 mr-1" />
+                      {loading ? (
+                        <div className="w-4 h-4 border-2 border-muted-foreground/30 border-t-muted-foreground rounded-full animate-spin mr-1" />
+                      ) : (
+                        <ArrowLeft className="w-4 h-4 mr-1" />
+                      )}
                       Back to Account Verification
                     </Button>
                   </div>

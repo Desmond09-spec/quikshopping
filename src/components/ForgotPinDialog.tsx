@@ -3,7 +3,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
-import { Mail, Lock, Eye, EyeOff, ArrowLeft } from 'lucide-react';
+import { Mail, Lock, Eye, EyeOff, ArrowLeft, HelpCircle } from 'lucide-react';
 import { useAdmin } from '@/contexts/AdminContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -21,74 +21,90 @@ const ForgotPinDialog: React.FC<ForgotPinDialogProps> = ({
 }) => {
   const { adminSettings, resetPin, loading } = useAdmin();
   const { toast } = useToast();
-  const [step, setStep] = useState<'email' | 'otp' | 'reset'>('email');
+  const [step, setStep] = useState<'email' | 'security' | 'reset'>('email');
   const [formData, setFormData] = useState({
     email: adminSettings?.adminEmail || '',
-    otp: '',
+    securityAnswer: '',
     newPin: '',
     confirmPin: ''
   });
+  const [securityQuestion, setSecurityQuestion] = useState<string>('');
   const [showPin, setShowPin] = useState(false);
   const [showConfirmPin, setShowConfirmPin] = useState(false);
   const [error, setError] = useState('');
-  const [otpLoading, setOtpLoading] = useState(false);
+  const [emailLoading, setEmailLoading] = useState(false);
+  const [verifyLoading, setVerifyLoading] = useState(false);
+  const [resetLoading, setResetLoading] = useState(false);
 
-  const handleSendOtp = async (e: React.FormEvent) => {
+  const handleVerifyEmail = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
-    setOtpLoading(true);
+    setEmailLoading(true);
 
     try {
-      const { data, error } = await supabase.functions.invoke('send-otp', {
-        body: { email: formData.email }
-      });
+      // Get admin settings to retrieve security question
+      const { data: settings, error } = await supabase
+        .from('admin_settings')
+        .select('security_question, admin_email')
+        .eq('admin_email', formData.email)
+        .single();
 
-      if (error) throw error;
-
-      setStep('otp');
-      toast({
-        title: "OTP sent",
-        description: "Check your email for the 6-digit verification code.",
-      });
-
-      // Show OTP in console for development
-      if (data?.devOtp) {
-        console.log('Development OTP:', data.devOtp);
-        toast({
-          title: "Development Mode",
-          description: `OTP: ${data.devOtp} (check console)`,
-          variant: "default",
-        });
+      if (error || !settings) {
+        setError('Admin account not found with this email address');
+        return;
       }
+
+      if (!settings.security_question) {
+        setError('Security question not configured for this account');
+        return;
+      }
+
+      setSecurityQuestion(settings.security_question);
+      setStep('security');
     } catch (error: any) {
-      setError(error.message || 'Failed to send OTP');
+      setError(error.message || 'Failed to verify email');
     } finally {
-      setOtpLoading(false);
+      setEmailLoading(false);
     }
   };
 
-  const handleVerifyOtp = async (e: React.FormEvent) => {
+  const handleVerifySecurityAnswer = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    setVerifyLoading(true);
 
     try {
-      const { data, error } = await supabase.functions.invoke('verify-otp', {
+      const { data, error } = await supabase.functions.invoke('verify-security-answer', {
         body: { 
-          email: formData.email,
-          otp: formData.otp 
+          adminEmail: formData.email,
+          securityAnswer: formData.securityAnswer,
+          newPin: formData.newPin
         }
       });
 
       if (error) throw error;
-      if (!data?.verified) throw new Error('OTP verification failed');
 
-      setStep('reset');
       toast({
-        title: "OTP verified",
-        description: "You can now set a new PIN.",
+        title: "PIN reset successfully",
+        description: "Your admin PIN has been updated.",
       });
+      
+      handleOpenChange(false);
     } catch (error: any) {
-      setError(error.message || 'Invalid verification code');
+      // Handle specific error messages for better UX
+      if (error.message?.includes('Too many failed attempts')) {
+        setError(error.message);
+      } else if (error.message?.includes('Incorrect security answer')) {
+        setError(error.message);
+      } else if (error.message?.includes('Admin not configured')) {
+        setError('Admin account not found. Please contact support.');
+      } else if (error.message?.includes('Email does not match')) {
+        setError('Email does not match your admin account.');
+      } else {
+        setError(error.message || 'Failed to reset PIN');
+      }
+    } finally {
+      setVerifyLoading(false);
     }
   };
 
@@ -106,12 +122,8 @@ const ForgotPinDialog: React.FC<ForgotPinDialogProps> = ({
       return;
     }
 
-    try {
-      await resetPin(formData.newPin, formData.confirmPin);
-      handleOpenChange(false);
-    } catch (error: any) {
-      setError(error.message || 'Failed to reset PIN');
-    }
+    // Proceed to verification step
+    setStep('reset');
   };
 
   const handleOpenChange = (newOpen: boolean) => {
@@ -119,10 +131,11 @@ const ForgotPinDialog: React.FC<ForgotPinDialogProps> = ({
       setStep('email');
       setFormData({
         email: adminSettings?.adminEmail || '',
-        otp: '',
+        securityAnswer: '',
         newPin: '',
         confirmPin: ''
       });
+      setSecurityQuestion('');
       setError('');
       setShowPin(false);
       setShowConfirmPin(false);
@@ -134,11 +147,11 @@ const ForgotPinDialog: React.FC<ForgotPinDialogProps> = ({
     if (step === 'email') {
       handleOpenChange(false);
       onBack();
-    } else if (step === 'otp') {
+    } else if (step === 'security') {
       setStep('email');
       setError('');
     } else {
-      setStep('otp');
+      setStep('security');
       setError('');
     }
   };
@@ -166,18 +179,20 @@ const ForgotPinDialog: React.FC<ForgotPinDialogProps> = ({
               <ArrowLeft className="w-5 h-5" />
             </Button>
             <div className="w-10 h-10 bg-destructive/20 rounded-lg flex items-center justify-center">
-              <Lock className="w-6 h-6 text-destructive" />
+              {step === 'email' && <Lock className="w-6 h-6 text-destructive" />}
+              {step === 'security' && <HelpCircle className="w-6 h-6 text-primary" />}
+              {step === 'reset' && <Lock className="w-6 h-6 text-destructive" />}
             </div>
             <div>
               <DialogTitle className="text-foreground">
                 {step === 'email' && 'Reset PIN'}
-                {step === 'otp' && 'Verify Email'}
+                {step === 'security' && 'Answer Security Question'}
                 {step === 'reset' && 'Set New PIN'}
               </DialogTitle>
               <p className="text-sm text-muted-foreground">
-                {step === 'email' && "We'll send a verification code to your email"}
-                {step === 'otp' && 'Enter the code sent to your email'}
-                {step === 'reset' && 'Choose a new PIN for admin access'}
+                {step === 'email' && 'Enter your admin email to start the reset process'}
+                {step === 'security' && 'Answer your security question to reset your PIN'}
+                {step === 'reset' && 'Enter your security answer and new PIN'}
               </p>
             </div>
           </div>
@@ -185,7 +200,7 @@ const ForgotPinDialog: React.FC<ForgotPinDialogProps> = ({
         
         {/* Step 1: Email */}
         {step === 'email' && (
-          <form onSubmit={handleSendOtp} className="space-y-4">
+          <form onSubmit={handleVerifyEmail} className="space-y-4">
             {error && (
               <div className="p-3 bg-destructive/10 border border-destructive/20 rounded-lg">
                 <p className="text-sm text-destructive">{error}</p>
@@ -202,39 +217,36 @@ const ForgotPinDialog: React.FC<ForgotPinDialogProps> = ({
                 type="email"
                 value={formData.email}
                 onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
-                placeholder="admin@example.com"
+                placeholder="Enter your admin email"
                 required
                 autoFocus
-                disabled={!!adminSettings?.adminEmail}
               />
-              {adminSettings?.adminEmail && (
-                <p className="text-xs text-muted-foreground">
-                  OTP will be sent to your registered admin email
-                </p>
-              )}
+              <p className="text-xs text-muted-foreground">
+                Enter the email address associated with your admin account
+              </p>
             </div>
 
             <Button 
               type="submit"
               variant="default"
               className="w-full"
-              disabled={otpLoading || !formData.email}
+              disabled={emailLoading || !formData.email}
             >
-              {otpLoading ? (
+              {emailLoading ? (
                 <div className="flex items-center space-x-2">
                   <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                  <span>Sending OTP...</span>
+                  <span>Verifying...</span>
                 </div>
               ) : (
-                'Send Verification Code'
+                'Verify Email'
               )}
             </Button>
           </form>
         )}
 
-        {/* Step 2: OTP Verification */}
-        {step === 'otp' && (
-          <form onSubmit={handleVerifyOtp} className="space-y-4">
+        {/* Step 2: Security Question */}
+        {step === 'security' && (
+          <form onSubmit={handleResetPin} className="space-y-4">
             {error && (
               <div className="p-3 bg-destructive/10 border border-destructive/20 rounded-lg">
                 <p className="text-sm text-destructive">{error}</p>
@@ -242,50 +254,29 @@ const ForgotPinDialog: React.FC<ForgotPinDialogProps> = ({
             )}
 
             <div className="p-3 bg-muted/30 rounded-lg">
-              <p className="text-xs text-muted-foreground">Verification code sent to</p>
+              <p className="text-xs text-muted-foreground">Security question for</p>
               <p className="text-sm text-foreground font-medium">{formData.email}</p>
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="otp" className="text-foreground">Verification Code</Label>
+              <Label className="text-foreground">Security Question</Label>
+              <div className="p-3 bg-muted/20 border rounded-lg">
+                <p className="text-sm text-foreground">{securityQuestion}</p>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="securityAnswer" className="text-foreground">Your Answer</Label>
               <Input
-                id="otp"
+                id="securityAnswer"
                 type="text"
-                value={formData.otp}
-                onChange={(e) => setFormData(prev => ({ ...prev, otp: e.target.value }))}
-                placeholder="Enter 6-digit code"
-                maxLength={6}
+                value={formData.securityAnswer}
+                onChange={(e) => setFormData(prev => ({ ...prev, securityAnswer: e.target.value }))}
+                placeholder="Enter your answer"
                 required
                 autoFocus
               />
             </div>
-
-            <Button 
-              type="submit"
-              variant="default"
-              className="w-full"
-              disabled={loading || !formData.otp}
-            >
-              {loading ? (
-                <div className="flex items-center space-x-2">
-                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                  <span>Verifying...</span>
-                </div>
-              ) : (
-                'Verify Code'
-              )}
-            </Button>
-          </form>
-        )}
-
-        {/* Step 3: Reset PIN */}
-        {step === 'reset' && (
-          <form onSubmit={handleResetPin} className="space-y-4">
-            {error && (
-              <div className="p-3 bg-destructive/10 border border-destructive/20 rounded-lg">
-                <p className="text-sm text-destructive">{error}</p>
-              </div>
-            )}
 
             <div className="space-y-2">
               <Label htmlFor="newPin" className="text-foreground">New PIN</Label>
@@ -298,7 +289,6 @@ const ForgotPinDialog: React.FC<ForgotPinDialogProps> = ({
                   placeholder="Enter new 4+ digit PIN"
                   maxLength={8}
                   required
-                  autoFocus
                 />
                 <Button
                   type="button"
@@ -365,17 +355,68 @@ const ForgotPinDialog: React.FC<ForgotPinDialogProps> = ({
               type="submit"
               variant="default"
               className="w-full"
-              disabled={loading || formData.newPin !== formData.confirmPin || formData.newPin.length < 4}
+              disabled={!formData.securityAnswer || formData.newPin !== formData.confirmPin || formData.newPin.length < 4}
             >
-              {loading ? (
-                <div className="flex items-center space-x-2">
-                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                  <span>Resetting PIN...</span>
-                </div>
-              ) : (
-                'Reset PIN'
-              )}
+              Next Step
             </Button>
+          </form>
+        )}
+
+        {/* Step 3: Reset Confirmation */}
+        {step === 'reset' && (
+          <form onSubmit={handleVerifySecurityAnswer} className="space-y-4">
+            {error && (
+              <div className="p-3 bg-destructive/10 border border-destructive/20 rounded-lg">
+                <p className="text-sm text-destructive">{error}</p>
+              </div>
+            )}
+
+            <div className="p-3 bg-primary/10 border border-primary/20 rounded-lg">
+              <h4 className="text-sm font-medium text-foreground mb-2">Confirm PIN Reset</h4>
+              <p className="text-xs text-muted-foreground mb-2">
+                You are about to reset your admin PIN for:
+              </p>
+              <p className="text-sm font-medium text-foreground">{formData.email}</p>
+            </div>
+
+            <div className="p-3 bg-muted/20 border rounded-lg">
+              <p className="text-xs text-muted-foreground mb-1">Security Question:</p>
+              <p className="text-sm text-foreground">{securityQuestion}</p>
+              <p className="text-xs text-muted-foreground mt-1 mb-1">Your Answer:</p>
+              <p className="text-sm text-foreground">{formData.securityAnswer}</p>
+            </div>
+
+            <div className="p-3 bg-muted/20 border rounded-lg">
+              <p className="text-xs text-muted-foreground mb-1">New PIN:</p>
+              <p className="text-sm text-foreground">{'●'.repeat(formData.newPin.length)} ({formData.newPin.length} digits)</p>
+            </div>
+
+            <div className="flex space-x-3">
+              <Button 
+                type="button"
+                variant="outline"
+                className="flex-1"
+                onClick={() => setStep('security')}
+                disabled={verifyLoading}
+              >
+                Back
+              </Button>
+              <Button 
+                type="submit"
+                variant="default"
+                className="flex-1"
+                disabled={verifyLoading}
+              >
+                {verifyLoading ? (
+                  <div className="flex items-center space-x-2">
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    <span>Resetting...</span>
+                  </div>
+                ) : (
+                  'Reset PIN'
+                )}
+              </Button>
+            </div>
           </form>
         )}
       </DialogContent>

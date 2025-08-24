@@ -37,6 +37,12 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     // Set up auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
+        // Only clear cashier authentication on explicit sign out
+        // Don't clear on SIGNED_IN as this is triggered by token refreshes and app focus
+        if (event === 'SIGNED_OUT') {
+          localStorage.removeItem('cashier_authenticated');
+        }
+        
         const isFullyAuthenticated = session?.user && localStorage.getItem('cashier_authenticated') === 'true';
         setAuthState({
           user: session?.user ?? null,
@@ -65,7 +71,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     try {
       const redirectUrl = `${window.location.origin}/`;
       
-      const { error } = await supabase.auth.signUp({
+      const { data, error } = await supabase.auth.signUp({
         email,
         password,
         options: {
@@ -78,31 +84,44 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
       if (error) throw error;
 
+      // Check if user was actually created (data.user will be null if email already exists)
+      if (!data.user) {
+        toast({
+          title: "Account already exists",
+          description: "An account with this email already exists. Please sign in instead.",
+          variant: "destructive",
+        });
+        throw new Error("Account already exists");
+      }
+
       toast({
         title: "Account created",
         description: "Your account has been created successfully. Please check your email to verify your account.",
       });
     } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error.message,
-        variant: "destructive",
-      });
+      // Only show error toast if it's not the "Account already exists" error
+      if (error.message !== "Account already exists") {
+        toast({
+          title: "Error",
+          description: error.message,
+          variant: "destructive",
+        });
+      }
       throw error;
     }
   };
 
   const verifyAccount = async (email: string, password: string) => {
     try {
+      // Clear any previous cashier authentication BEFORE signing in
+      localStorage.removeItem('cashier_authenticated');
+      
       const { error } = await supabase.auth.signInWithPassword({
         email,
         password
       });
 
       if (error) throw error;
-
-      // Clear any previous cashier authentication
-      localStorage.removeItem('cashier_authenticated');
 
       toast({
         title: "Account verified",

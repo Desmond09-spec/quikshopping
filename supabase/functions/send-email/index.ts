@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
+import { Resend } from "npm:resend@latest"
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -26,24 +27,16 @@ serve(async (req) => {
     // Try Resend first
     if (resendApiKey && !emailSent) {
       try {
-        const response = await fetch('https://api.resend.com/emails', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${resendApiKey}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            from: 'noreply@yourdomain.com',
-            to: [to],
-            subject: subject,
-            html: html,
-          }),
+        const resend = new Resend(resendApiKey)
+        const data = await resend.emails.send({
+          from: 'onboarding@resend.dev',
+          to: [to],
+          subject: subject,
+          html: html,
         })
         
-        if (response.ok) {
-          emailSent = true
-          console.log('Email sent via Resend')
-        }
+        console.log('Email sent via Resend:', data)
+        emailSent = true
       } catch (resendError) {
         console.log('Resend failed, trying fallback:', resendError)
       }
@@ -62,7 +55,7 @@ serve(async (req) => {
             personalizations: [{
               to: [{ email: to }],
             }],
-            from: { email: 'noreply@yourdomain.com' },
+            from: { email: 'onboarding@resend.dev' },
             subject: subject,
             content: [{
               type: 'text/html',

@@ -18,7 +18,8 @@ import {
   Tag,
   Settings,
   ShieldCheck,
-  ShieldX
+  ShieldX,
+  Mail
 } from 'lucide-react';
 import { useProducts } from '@/contexts/SupabaseProductContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -74,12 +75,18 @@ const ActivityDetails: React.FC = () => {
         return <LogOut className="w-6 h-6" />;
       case 'admin_signin':
         return <ShieldCheck className="w-6 h-6" />;
+      case 'admin_signin_failed':
+        return <ShieldX className="w-6 h-6" />;
       case 'admin_signout':
         return <ShieldX className="w-6 h-6" />;
       case 'admin_settings_changed':
         return <Settings className="w-6 h-6" />;
       case 'admin_pin_reset':
         return <ShieldCheck className="w-6 h-6" />;
+      case 'admin_pin_reset_failed':
+        return <ShieldX className="w-6 h-6" />;
+      case 'security_question_updated':
+        return <Settings className="w-6 h-6" />;
       case 'cashier_mode_changed':
         return <Settings className="w-6 h-6" />;
       case 'cashier_added':
@@ -91,6 +98,12 @@ const ActivityDetails: React.FC = () => {
       case 'category_edited':
         return <Edit className="w-6 h-6" />;
       case 'category_deleted':
+        return <Trash className="w-6 h-6" />;
+      case 'admin_setup':
+      case 'admin_initialized':
+        return <ShieldCheck className="w-6 h-6" />;
+      case 'data_cleared':
+      case 'system_reset':
         return <Trash className="w-6 h-6" />;
       default:
         return <Activity className="w-6 h-6" />;
@@ -115,12 +128,18 @@ const ActivityDetails: React.FC = () => {
         return 'bg-amber-500/20 text-amber-400 border-amber-500/30';
       case 'admin_signin':
         return 'bg-indigo-500/20 text-indigo-400 border-indigo-500/30';
+      case 'admin_signin_failed':
+        return 'bg-red-500/20 text-red-400 border-red-500/30';
       case 'admin_signout':
         return 'bg-rose-500/20 text-rose-400 border-rose-500/30';
       case 'admin_settings_changed':
         return 'bg-violet-500/20 text-violet-400 border-violet-500/30';
       case 'admin_pin_reset':
         return 'bg-cyan-500/20 text-cyan-400 border-cyan-500/30';
+      case 'admin_pin_reset_failed':
+        return 'bg-red-500/20 text-red-400 border-red-500/30';
+      case 'security_question_updated':
+        return 'bg-violet-500/20 text-violet-400 border-violet-500/30';
       case 'cashier_mode_changed':
         return 'bg-orange-500/20 text-orange-400 border-orange-500/30';
       case 'cashier_added':
@@ -132,6 +151,12 @@ const ActivityDetails: React.FC = () => {
       case 'category_edited':
         return 'bg-blue-500/20 text-blue-400 border-blue-500/30';
       case 'category_deleted':
+        return 'bg-red-500/20 text-red-400 border-red-500/30';
+      case 'admin_setup':
+      case 'admin_initialized':
+        return 'bg-indigo-500/20 text-indigo-400 border-indigo-500/30';
+      case 'data_cleared':
+      case 'system_reset':
         return 'bg-red-500/20 text-red-400 border-red-500/30';
       default:
         return 'bg-gray-500/20 text-gray-400 border-gray-500/30';
@@ -156,12 +181,18 @@ const ActivityDetails: React.FC = () => {
         return 'User Sign Out';
       case 'admin_signin':
         return 'Admin Sign In';
+      case 'admin_signin_failed':
+        return 'Admin Sign In Failed';
       case 'admin_signout':
         return 'Admin Sign Out';
       case 'admin_settings_changed':
         return 'Admin Settings Changed';
       case 'admin_pin_reset':
         return 'Admin PIN Reset';
+      case 'admin_pin_reset_failed':
+        return 'Admin PIN Reset Failed';
+      case 'security_question_updated':
+        return 'Security Question Updated';
       case 'cashier_mode_changed':
         return 'Cashier Sign-In Mode Changed';
       case 'cashier_added':
@@ -174,6 +205,12 @@ const ActivityDetails: React.FC = () => {
         return 'Category Edited';
       case 'category_deleted':
         return 'Category Deleted';
+      case 'admin_setup':
+      case 'admin_initialized':
+        return 'Admin Setup';
+      case 'data_cleared':
+      case 'system_reset':
+        return 'Data Cleared';
       default:
         return 'Activity';
     }
@@ -254,7 +291,7 @@ const ActivityDetails: React.FC = () => {
             )}
 
             {/* Detailed Information */}
-            {activity.details && (activity.type === 'sale_completed' || activity.type === 'product_added' || activity.type === 'product_edited' || activity.type === 'product_deleted' || activity.type === 'category_added' || activity.type === 'category_edited' || activity.type === 'category_deleted' || activity.type === 'cashier_mode_changed' || activity.type === 'cashier_added' || activity.type === 'cashier_removed' || activity.type === 'admin_pin_reset') && (
+            {activity.details && (activity.type === 'sale_completed' || activity.type === 'product_added' || activity.type === 'product_edited' || activity.type === 'product_deleted' || activity.type === 'category_added' || activity.type === 'category_edited' || activity.type === 'category_deleted' || activity.type === 'cashier_mode_changed' || activity.type === 'cashier_added' || activity.type === 'cashier_removed' || activity.type === 'admin_pin_reset' || activity.type === 'admin_signin_failed' || activity.type === 'admin_pin_reset_failed' || activity.type === 'security_question_updated' || activity.type === 'admin_settings_changed') && (
               <div className="space-y-4">
                 <h3 className="text-lg font-semibold text-foreground">Detailed Information</h3>
                 
@@ -551,11 +588,13 @@ const ActivityDetails: React.FC = () => {
                     
                     <Card className="bg-orange-500/10 border-orange-500/20">
                       <CardContent className="p-4">
-                        <div className="flex items-center space-x-2">
-                          <User className="w-5 h-5 text-orange-400" />
-                          <div>
+                        <div className="flex items-center space-x-2 min-w-0">
+                          <Mail className="w-5 h-5 text-orange-400 flex-shrink-0" />
+                          <div className="min-w-0 flex-1">
                             <p className="text-sm text-muted-foreground">Changed by</p>
-                            <p className="text-lg font-bold text-foreground">{activity.details.changedBy || 'Admin'}</p>
+                            <p className="text-lg font-bold text-foreground truncate" title={activity.details.changedBy || 'Admin'}>
+                              {activity.details.changedBy || 'Admin'}
+                            </p>
                           </div>
                         </div>
                       </CardContent>
@@ -580,11 +619,13 @@ const ActivityDetails: React.FC = () => {
                     
                     <Card className="bg-teal-500/10 border-teal-500/20">
                       <CardContent className="p-4">
-                        <div className="flex items-center space-x-2">
-                          <ShieldCheck className="w-5 h-5 text-teal-400" />
-                          <div>
+                        <div className="flex items-center space-x-2 min-w-0">
+                          <Mail className="w-5 h-5 text-teal-400 flex-shrink-0" />
+                          <div className="min-w-0 flex-1">
                             <p className="text-sm text-muted-foreground">Added by</p>
-                            <p className="text-lg font-bold text-foreground">{activity.details.addedBy || 'Admin'}</p>
+                            <p className="text-lg font-bold text-foreground truncate" title={activity.details.addedBy || 'Admin'}>
+                              {activity.details.addedBy || 'Admin'}
+                            </p>
                           </div>
                         </div>
                       </CardContent>
@@ -609,41 +650,12 @@ const ActivityDetails: React.FC = () => {
                     
                     <Card className="bg-pink-500/10 border-pink-500/20">
                       <CardContent className="p-4">
-                        <div className="flex items-center space-x-2">
-                          <ShieldX className="w-5 h-5 text-pink-400" />
-                          <div>
+                        <div className="flex items-center space-x-2 min-w-0">
+                          <Mail className="w-5 h-5 text-pink-400 flex-shrink-0" />
+                          <div className="min-w-0 flex-1">
                             <p className="text-sm text-muted-foreground">Removed by</p>
-                            <p className="text-lg font-bold text-foreground">{activity.details.removedBy || 'Admin'}</p>
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  </div>
-                )}
-
-                {/* Admin PIN Reset Details */}
-                {activity.type === 'admin_pin_reset' && (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <Card className="bg-cyan-500/10 border-cyan-500/20">
-                      <CardContent className="p-4">
-                        <div className="flex items-center space-x-2">
-                          <ShieldCheck className="w-5 h-5 text-cyan-400" />
-                          <div>
-                            <p className="text-sm text-muted-foreground">Admin Email</p>
-                            <p className="text-lg font-bold text-foreground">{activity.details.adminEmail}</p>
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                    
-                    <Card className="bg-cyan-500/10 border-cyan-500/20">
-                      <CardContent className="p-4">
-                        <div className="flex items-center space-x-2">
-                          <Calendar className="w-5 h-5 text-cyan-400" />
-                          <div>
-                            <p className="text-sm text-muted-foreground">Reset Time</p>
-                            <p className="text-sm font-medium text-foreground">
-                              {activity.details.resetTime ? format(new Date(activity.details.resetTime), 'PPp') : 'N/A'}
+                            <p className="text-lg font-bold text-foreground truncate" title={activity.details.removedBy || 'Admin'}>
+                              {activity.details.removedBy || 'Admin'}
                             </p>
                           </div>
                         </div>
@@ -651,10 +663,238 @@ const ActivityDetails: React.FC = () => {
                     </Card>
                   </div>
                 )}
-              </div>
-            )}
-          </CardContent>
-        </Card>
+
+                {/* Admin Sign In Failed Details */}
+                {activity.type === 'admin_signin_failed' && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <Card className="bg-red-500/10 border-red-500/20">
+                      <CardContent className="p-4">
+                        <div className="flex items-center space-x-2 min-w-0">
+                          <Mail className="w-5 h-5 text-red-400 flex-shrink-0" />
+                          <div className="min-w-0 flex-1">
+                            <p className="text-sm text-muted-foreground">Admin Email</p>
+                            <p className="text-lg font-bold text-foreground truncate" title={activity.details.adminEmail}>
+                              {activity.details.adminEmail}
+                            </p>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                    
+                    <Card className="bg-red-500/10 border-red-500/20">
+                      <CardContent className="p-4">
+                        <div className="flex items-center space-x-2">
+                          <Calendar className="w-5 h-5 text-red-400" />
+                          <div>
+                            <p className="text-sm text-muted-foreground">Attempt Time</p>
+                            <p className="text-sm font-medium text-foreground">
+                              {activity.details.attemptTime ? format(new Date(activity.details.attemptTime), 'PPp') : 'N/A'}
+                            </p>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </div>
+                )}
+
+                 {/* Admin PIN Reset Details */}
+                 {activity.type === 'admin_pin_reset' && (
+                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <Card className="bg-cyan-500/10 border-cyan-500/20">
+                        <CardContent className="p-4">
+                          <div className="flex items-center space-x-2 min-w-0">
+                            <Mail className="w-5 h-5 text-cyan-400 flex-shrink-0" />
+                            <div className="min-w-0 flex-1">
+                              <p className="text-sm text-muted-foreground">Admin Email</p>
+                              <p className="text-lg font-bold text-foreground truncate" title={activity.details.adminEmail}>
+                                {activity.details.adminEmail}
+                              </p>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                     
+                     <Card className="bg-cyan-500/10 border-cyan-500/20">
+                       <CardContent className="p-4">
+                         <div className="flex items-center space-x-2">
+                           <Calendar className="w-5 h-5 text-cyan-400" />
+                           <div>
+                             <p className="text-sm text-muted-foreground">Reset Time</p>
+                             <p className="text-sm font-medium text-foreground">
+                               {activity.details.resetTime ? format(new Date(activity.details.resetTime), 'PPp') : 'N/A'}
+                             </p>
+                           </div>
+                         </div>
+                       </CardContent>
+                     </Card>
+                   </div>
+                 )}
+
+                 {/* Admin PIN Reset Failed Details */}
+                 {activity.type === 'admin_pin_reset_failed' && (
+                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                     <Card className="bg-red-500/10 border-red-500/20">
+                       <CardContent className="p-4">
+                         <div className="flex items-center space-x-2 min-w-0">
+                           <Mail className="w-5 h-5 text-red-400 flex-shrink-0" />
+                           <div className="min-w-0 flex-1">
+                             <p className="text-sm text-muted-foreground">Admin Email</p>
+                             <p className="text-lg font-bold text-foreground truncate" title={activity.details.adminEmail}>
+                               {activity.details.adminEmail}
+                             </p>
+                           </div>
+                         </div>
+                       </CardContent>
+                     </Card>
+                     
+                     <Card className="bg-red-500/10 border-red-500/20">
+                       <CardContent className="p-4">
+                         <div className="flex items-center space-x-2">
+                           <Calendar className="w-5 h-5 text-red-400" />
+                           <div>
+                             <p className="text-sm text-muted-foreground">Attempt Time</p>
+                             <p className="text-sm font-medium text-foreground">
+                               {activity.details.attemptTime ? format(new Date(activity.details.attemptTime), 'PPp') : 'N/A'}
+                             </p>
+                           </div>
+                         </div>
+                       </CardContent>
+                     </Card>
+
+                     <Card className="bg-red-500/10 border-red-500/20">
+                       <CardContent className="p-4">
+                         <div className="flex items-center space-x-2">
+                           <Hash className="w-5 h-5 text-red-400" />
+                           <div>
+                             <p className="text-sm text-muted-foreground">Attempt Number</p>
+                             <p className="text-lg font-bold text-foreground">
+                               {activity.details.attemptNumber}/3
+                             </p>
+                           </div>
+                         </div>
+                       </CardContent>
+                     </Card>
+
+                     {activity.details.locked && (
+                       <Card className="bg-red-500/10 border-red-500/20 md:col-span-2 lg:col-span-3">
+                         <CardContent className="p-4">
+                           <div className="flex items-center space-x-2">
+                             <ShieldX className="w-5 h-5 text-red-400" />
+                             <div>
+                               <p className="text-sm text-muted-foreground">Account Status</p>
+                               <p className="text-lg font-bold text-red-400">Temporarily Locked</p>
+                             </div>
+                           </div>
+                         </CardContent>
+                       </Card>
+                     )}
+                   </div>
+                 )}
+
+                 {/* Security Question Updated Details */}
+                 {activity.type === 'security_question_updated' && (
+                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                     <Card className="bg-violet-500/10 border-violet-500/20">
+                       <CardContent className="p-4">
+                         <div className="flex items-center space-x-2 min-w-0">
+                           <Mail className="w-5 h-5 text-violet-400 flex-shrink-0" />
+                           <div className="min-w-0 flex-1">
+                             <p className="text-sm text-muted-foreground">Admin Email</p>
+                             <p className="text-lg font-bold text-foreground truncate" title={activity.details.adminEmail}>
+                               {activity.details.adminEmail}
+                             </p>
+                           </div>
+                         </div>
+                       </CardContent>
+                     </Card>
+                     
+                     <Card className="bg-violet-500/10 border-violet-500/20">
+                       <CardContent className="p-4">
+                         <div className="flex items-center space-x-2">
+                           <Calendar className="w-5 h-5 text-violet-400" />
+                           <div>
+                             <p className="text-sm text-muted-foreground">Update Time</p>
+                             <p className="text-sm font-medium text-foreground">
+                               {activity.details.updateTime ? format(new Date(activity.details.updateTime), 'PPp') : 'N/A'}
+                             </p>
+                           </div>
+                         </div>
+                       </CardContent>
+                     </Card>
+                    </div>
+                  )}
+
+                {/* Admin Settings Explanation Section */}
+                {(activity.type === 'admin_settings_changed' || activity.type === 'admin_signin_failed' || activity.type === 'admin_pin_reset' || activity.type === 'admin_pin_reset_failed' || activity.type === 'security_question_updated') && (
+                  <div className="space-y-4">
+                    <h4 className="font-medium text-foreground">What This Means</h4>
+                    <div className="bg-muted/30 rounded-lg p-4 space-y-2">
+                      {activity.type === 'admin_settings_changed' && activity.details.settingChanged && (
+                        <div className="space-y-2">
+                          <p className="text-sm text-foreground font-medium">Setting Changed:</p>
+                          {activity.details.settingChanged === 'disable_cashier_dialog' && (
+                            <div className="text-sm text-muted-foreground space-y-1">
+                              <p>• <strong>Cashier Dialog Modal:</strong> {activity.details.newValue ? 'Disabled' : 'Enabled'}</p>
+                              {activity.details.newValue ? (
+                                <p>• Product operations (add, edit, delete) will no longer require cashier name confirmation</p>
+                              ) : (
+                                <p>• Product operations will now require cashier name confirmation for better tracking</p>
+                              )}
+                              <p>• This affects how your team interacts with product management features</p>
+                            </div>
+                          )}
+                          {activity.details.settingChanged === 'require_admin_for_product_actions' && (
+                            <div className="text-sm text-muted-foreground space-y-1">
+                              <p>• <strong>Admin Requirement for Products:</strong> {activity.details.newValue ? 'Enabled' : 'Disabled'}</p>
+                              {activity.details.newValue ? (
+                                <p>• Only admin users can now add, edit, or delete products</p>
+                              ) : (
+                                <p>• Any authorized user can now manage products without admin access</p>
+                              )}
+                              <p>• This setting controls who has permission to modify your product inventory</p>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                      
+                      {activity.type === 'admin_signin_failed' && (
+                        <div className="text-sm text-muted-foreground space-y-1">
+                          <p>• Someone attempted to sign in as admin but entered an incorrect PIN</p>
+                          <p>• Multiple failed attempts may temporarily lock the admin account for security</p>
+                          <p>• If this wasn't you, consider updating your admin PIN immediately</p>
+                        </div>
+                      )}
+                      
+                      {activity.type === 'admin_pin_reset' && (
+                        <div className="text-sm text-muted-foreground space-y-1">
+                          <p>• The admin PIN has been successfully changed</p>
+                          <p>• Use the new PIN for future admin sign-ins</p>
+                          <p>• Old PIN is no longer valid and cannot be used</p>
+                        </div>
+                      )}
+                      
+                      {activity.type === 'admin_pin_reset_failed' && (
+                        <div className="text-sm text-muted-foreground space-y-1">
+                          <p>• An attempt to reset the admin PIN was unsuccessful</p>
+                          <p>• This could be due to invalid verification or security question answer</p>
+                          <p>• Contact support if you're unable to reset your PIN after multiple attempts</p>
+                        </div>
+                      )}
+                      
+                      {activity.type === 'security_question_updated' && (
+                        <div className="text-sm text-muted-foreground space-y-1">
+                          <p>• Your security question has been updated successfully</p>
+                          <p>• This question will be used for PIN recovery if you forget your admin PIN</p>
+                          <p>• Keep your security answer confidential and memorable</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+               </div>
+             )}
+           </CardContent>
+         </Card>
       </div>
     </Layout>
   );
