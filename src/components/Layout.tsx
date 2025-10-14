@@ -12,7 +12,7 @@ interface LayoutProps {
 
 const Layout: React.FC<LayoutProps> = ({ children }) => {
   const location = useLocation();
-  const { state } = useCart();
+  const { activeCart } = useCart();
   const { user } = useAuth();
   const [showWalkthrough, setShowWalkthrough] = useState(false);
 
@@ -40,7 +40,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
       href: '/cart',
       icon: ShoppingBag,
       active: location.pathname === '/cart',
-      badge: state.items.length > 0 ? state.items.reduce((sum, item) => sum + item.quantity, 0) : undefined
+      badge: activeCart?.items.length ? activeCart.items.reduce((sum, item) => sum + item.quantity, 0) : undefined
     },
     {
       name: 'Add Product',
@@ -91,10 +91,10 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
             </div>
             
             {/* Cart Total Badge */}
-            {state.total > 0 && (
+            {activeCart && activeCart.total > 0 && (
               <div className="bg-primary/10 border border-primary/20 px-3 py-1 rounded-full">
                 <span className="text-sm font-medium text-primary">
-                  ₦{state.total.toLocaleString()}
+                  ₦{activeCart.total.toLocaleString()}
                 </span>
               </div>
             )}

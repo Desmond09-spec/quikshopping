@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ShoppingBag, Trash2, Plus, Minus, CreditCard } from 'lucide-react';
+import { ShoppingBag, Trash2, Plus, Minus, CreditCard, X, PlusCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -15,7 +15,7 @@ import { cn } from '@/lib/utils';
 
 const Cart: React.FC = () => {
   const navigate = useNavigate();
-  const { state, removeItem, updateQuantity, clearCart } = useCart();
+  const { carts, activeCart, activeCartId, removeItem, updateQuantity, clearCart, createNewCart, switchToCart, closeCart } = useCart();
   const { addTransaction, updateProductQuantity, products } = useProducts();
   const { toast } = useToast();
   const [showPaymentModal, setShowPaymentModal] = useState(false);
@@ -28,14 +28,15 @@ const Cart: React.FC = () => {
   });
 
   const handleQuantityChange = (itemId: string, newQuantity: number) => {
-    const cartItem = state.items.find(item => item.id === itemId);
+    if (!activeCart) return;
+    
+    const cartItem = activeCart.items.find(item => item.id === itemId);
     if (!cartItem) return;
 
     if (newQuantity <= 0) {
       removeItem(itemId);
     } else {
       const quantityDiff = newQuantity - cartItem.quantity;
-      // Find the product to check available quantity
       const product = products.find(p => p.id === cartItem.productId);
       
       if (product && quantityDiff > 0 && product.quantity < quantityDiff) {
@@ -49,6 +50,28 @@ const Cart: React.FC = () => {
       
       updateQuantity(itemId, newQuantity);
     }
+  };
+
+  const handleCreateNewCart = () => {
+    if (carts.length >= 10) {
+      toast({
+        title: "Maximum carts reached",
+        description: "You can have up to 10 carts at once",
+        variant: "destructive"
+      });
+      return;
+    }
+    createNewCart();
+  };
+
+  const handleCloseCart = (cartId: string) => {
+    const cart = carts.find(c => c.id === cartId);
+    if (cart && cart.items.length > 0) {
+      if (!confirm(`Close cart with ${cart.items.length} items?`)) {
+        return;
+      }
+    }
+    closeCart(cartId);
   };
 
   const handlePaymentMethodSelect = (method: PaymentMethod) => {
@@ -66,36 +89,40 @@ const Cart: React.FC = () => {
   };
 
   const handleFinalSubmit = async () => {
+    if (!activeCart || !activeCartId) return;
+    
     setIsCompletingSale(true);
     try {
       // Update product quantities based on cart items
-      for (const cartItem of state.items) {
+      for (const cartItem of activeCart.items) {
         const product = products.find(p => p.id === cartItem.productId);
         if (product) {
           await updateProductQuantity(cartItem.productId, -cartItem.quantity, true);
         }
       }
 
-    const transaction: Omit<Transaction, 'id'> = {
-      items: state.items,
-      total: state.total,
-      paymentMethod: formData.paymentMethod,
-      cashierName: formData.cashierName,
-      customer: formData.customer,
-      timestamp: new Date()
-    };
+      const transaction: Omit<Transaction, 'id'> = {
+        items: activeCart.items,
+        total: activeCart.total,
+        paymentMethod: formData.paymentMethod,
+        cashierName: formData.cashierName,
+        customer: formData.customer,
+        timestamp: new Date()
+      };
 
-    await addTransaction(transaction);
-    
-    // Reset everything
-    clearCart();
-    setShowPaymentModal(false);
-    setPaymentStep('method');
-    setFormData({
-      paymentMethod: 'cash',
-      cashierName: '',
-      customer: undefined
-    });
+      await addTransaction(transaction);
+      
+      // Close the current cart after successful transaction
+      closeCart(activeCartId);
+      
+      // Reset form
+      setShowPaymentModal(false);
+      setPaymentStep('method');
+      setFormData({
+        paymentMethod: 'cash',
+        cashierName: '',
+        customer: undefined
+      });
     } catch (error: any) {
       toast({
         title: "Error completing sale",
@@ -116,11 +143,12 @@ const Cart: React.FC = () => {
     });
   };
 
-  if (state.items.length === 0) {
+  if (!activeCart || activeCart.items.length === 0) {
     return (
       <Layout>
         <div className="container mx-auto px-4 py-12">
-          <div className="text-center">
+          <div className="max-w-4xl mx-auto">
+            <div className="text-center">
             <div className="w-24 h-24 bg-muted/30 rounded-full flex items-center justify-center mx-auto mb-6">
               <ShoppingBag className="w-12 h-12 text-muted-foreground" />
             </div>
@@ -130,6 +158,7 @@ const Cart: React.FC = () => {
               Browse Products
             </Button>
           </div>
+          </div>
         </div>
       </Layout>
     );
@@ -137,28 +166,73 @@ const Cart: React.FC = () => {
 
   return (
     <Layout>
-      <div className="container mx-auto px-4 py-6 space-y-6">
-        {/* Header */}
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold text-foreground">Shopping Cart</h1>
-            <p className="text-muted-foreground">{state.items.length} items</p>
+      <div className="container mx-auto px-4 py-6">
+        <div className="max-w-4xl mx-auto space-y-6">
+          {/* Cart Tabs */}
+          <div className="bg-card border border-border rounded-xl p-3 overflow-x-auto">
+            <div className="flex items-center gap-2 min-w-max">
+              {carts.map((cart) => (
+                <button
+                  key={cart.id}
+                  onClick={() => switchToCart(cart.id)}
+                  className={cn(
+                    "flex items-center gap-2 px-4 py-2 rounded-lg transition-all min-w-[140px]",
+                    cart.id === activeCartId
+                      ? "bg-gradient-primary text-primary-foreground shadow-md"
+                      : "bg-muted/30 text-foreground hover:bg-muted/50"
+                  )}
+                >
+                  <div className="flex-1 text-left">
+                    <p className="font-medium text-sm truncate">{cart.name}</p>
+                    <p className="text-xs opacity-80">{cart.items.length} items</p>
+                  </div>
+                  {carts.length > 1 && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleCloseCart(cart.id);
+                      }}
+                      className="p-1 hover:bg-black/10 rounded transition-colors"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  )}
+                </button>
+              ))}
+              
+              {carts.length < 10 && (
+                <button
+                  onClick={handleCreateNewCart}
+                  className="flex items-center gap-2 px-4 py-2 rounded-lg bg-muted/30 hover:bg-muted/50 text-foreground transition-all min-w-[120px]"
+                >
+                  <PlusCircle className="w-4 h-4" />
+                  <span className="text-sm font-medium">New Cart</span>
+                </button>
+              )}
+            </div>
           </div>
-          
-          <Button
-            variant="destructive"
-            size="sm"
-            onClick={clearCart}
-            className="hover:scale-105"
-          >
-            <Trash2 className="w-4 h-4" />
-            Clear All
-          </Button>
-        </div>
 
-        {/* Cart Items */}
-        <div className="space-y-3">
-          {state.items.map((item) => (
+          {/* Header */}
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-2xl font-bold text-foreground">{activeCart?.name || 'Shopping Cart'}</h1>
+              <p className="text-muted-foreground">{activeCart?.items.length || 0} items</p>
+            </div>
+            
+            <Button
+              variant="destructive"
+              size="sm"
+              onClick={clearCart}
+              className="hover:scale-105"
+            >
+              <Trash2 className="w-4 h-4" />
+              Clear All
+            </Button>
+          </div>
+
+          {/* Cart Items */}
+          <div className="space-y-3">
+          {activeCart?.items.map((item) => (
             <div
               key={item.id}
               className="bg-gradient-card border border-border rounded-xl p-4 transition-smooth hover:shadow-md"
@@ -222,13 +296,13 @@ const Cart: React.FC = () => {
           ))}
         </div>
 
-        {/* Total Summary */}
-        <div className="bg-gradient-card border border-border rounded-xl p-6 sticky bottom-24">
+          {/* Total Summary */}
+          <div className="bg-gradient-card border border-border rounded-xl p-6 sticky bottom-24">
           <div className="space-y-3">
             <div className="flex justify-between items-center text-lg">
               <span className="font-medium text-foreground">Total Amount</span>
               <span className="font-bold text-2xl text-primary">
-                ₦{state.total.toLocaleString()}
+                ₦{activeCart?.total.toLocaleString() || 0}
               </span>
             </div>
 
@@ -392,7 +466,7 @@ const Cart: React.FC = () => {
                         </div>
                         <div className="flex justify-between">
                           <span className="text-muted-foreground">Total Amount:</span>
-                          <span className="font-semibold text-primary">₦{state.total.toLocaleString()}</span>
+                          <span className="font-semibold text-primary">₦{activeCart?.total.toLocaleString() || 0}</span>
                         </div>
                         {formData.customer && (
                           <>
@@ -430,6 +504,7 @@ const Cart: React.FC = () => {
             </Dialog>
           </div>
         </div>
+      </div>
       </div>
     </Layout>
   );

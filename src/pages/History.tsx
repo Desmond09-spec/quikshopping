@@ -219,9 +219,10 @@ const History: React.FC = () => {
 
   return (
     <Layout>
-      <div className="container mx-auto px-4 py-6 space-y-6">
-        {/* Header */}
-        <div className="flex items-center space-x-3">
+      <div className="container mx-auto px-4 py-6">
+        <div className="max-w-5xl mx-auto space-y-6">
+          {/* Header */}
+          <div className="flex items-center space-x-3">
           <div className="w-10 h-10 bg-green-500/20 rounded-lg flex items-center justify-center">
             <HistoryIcon className="w-6 h-6 text-green-400" />
           </div>
@@ -231,8 +232,8 @@ const History: React.FC = () => {
           </div>
         </div>
 
-        {/* Summary Cards */}
-        <div className="grid grid-cols-2 gap-4">
+          {/* Summary Cards */}
+          <div className="grid grid-cols-2 md:grid-cols-2 gap-4">
           <Card className="bg-card border-border">
             <CardContent className="p-4">
               <div className="flex items-center space-x-3">
@@ -286,8 +287,8 @@ const History: React.FC = () => {
           </Card>
         </div>
 
-        {/* Period Filter */}
-        <div className="flex space-x-2 overflow-x-auto">
+          {/* Period Filter */}
+          <div className="flex space-x-2 overflow-x-auto">
           {[
             { key: 'today', label: 'Today' },
             { key: 'week', label: 'This Week' },
@@ -306,8 +307,8 @@ const History: React.FC = () => {
           ))}
         </div>
 
-        {/* Main Content */}
-        <Tabs value={selectedTab} onValueChange={(value: any) => setSelectedTab(value)}>
+          {/* Main Content */}
+          <Tabs value={selectedTab} onValueChange={(value: any) => setSelectedTab(value)}>
           <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="transactions">Sales</TabsTrigger>
             <TabsTrigger value="activities">All Activities</TabsTrigger>
@@ -617,6 +618,7 @@ const History: React.FC = () => {
             </div>
           </TabsContent>
         </Tabs>
+        </div>
       </div>
     </Layout>
   );

@@ -12,11 +12,11 @@ interface ProductCardProps {
 }
 
 const ProductCard: React.FC<ProductCardProps> = ({ product, onEdit }) => {
-  const { state, addItem } = useCart();
+  const { activeCart, addItem } = useCart();
   const { updateProductQuantity } = useProducts();
   
   // Check if product is in cart and get quantity
-  const cartItem = state.items.find(item => item.productId === product.id);
+  const cartItem = activeCart?.items.find(item => item.productId === product.id);
   const quantityInCart = cartItem?.quantity || 0;
   
   const isOutOfStock = product.quantity <= 0;

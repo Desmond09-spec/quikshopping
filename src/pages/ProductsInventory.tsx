@@ -101,9 +101,10 @@ const ProductsInventory: React.FC = () => {
 
   return (
     <Layout>
-      <div className="container mx-auto px-4 py-6 space-y-6">
-        {/* Header */}
-        <div className="flex items-center justify-between">
+      <div className="container mx-auto px-4 py-6">
+        <div className="max-w-6xl mx-auto space-y-6">
+          {/* Header */}
+          <div className="flex items-center justify-between">
           <div className="flex items-center space-x-3">
             <div className="w-10 h-10 bg-primary/20 rounded-lg flex items-center justify-center">
               <Package className="w-6 h-6 text-primary" />
@@ -309,6 +310,7 @@ const ProductsInventory: React.FC = () => {
             description={`Are you sure you want to delete "${productToDelete?.name}"? This action cannot be undone.`}
           />
         )}
+        </div>
       </div>
     </Layout>
   );

@@ -17,7 +17,7 @@ const buttonVariants = cva(
         ghost: "hover:bg-muted hover:text-foreground",
         link: "text-primary underline-offset-4 hover:underline",
         card: "bg-gradient-card border border-border hover:bg-muted shadow-md hover:shadow-lg",
-        premium: "bg-gradient-primary text-primary-foreground hover:scale-105 shadow-glow hover:shadow-lg",
+        premium: "bg-gradient-primary text-primary-foreground hover:brightness-110 shadow-glow hover:shadow-xl transition-all duration-300",
         hero: "bg-gradient-primary text-primary-foreground hover:scale-105 shadow-glow",
         "hero-outline": "border-2 border-white/30 text-white hover:bg-white/10 backdrop-blur-sm transition-all duration-300",
         glass: "bg-card/80 backdrop-blur-sm border border-border/50 hover:bg-card/90 shadow-sm",

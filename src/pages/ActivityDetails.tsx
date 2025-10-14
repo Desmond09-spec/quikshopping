@@ -39,7 +39,8 @@ const ActivityDetails: React.FC = () => {
     return (
       <Layout>
         <div className="container mx-auto px-4 py-6">
-          <div className="text-center py-12">
+          <div className="max-w-4xl mx-auto">
+            <div className="text-center py-12">
             <div className="w-16 h-16 bg-muted/30 rounded-full flex items-center justify-center mx-auto mb-4">
               <Activity className="w-8 h-8 text-muted-foreground" />
             </div>
@@ -51,6 +52,7 @@ const ActivityDetails: React.FC = () => {
               <ArrowLeft className="w-4 h-4" />
               Back to History
             </Button>
+          </div>
           </div>
         </div>
       </Layout>
@@ -218,9 +220,10 @@ const ActivityDetails: React.FC = () => {
 
   return (
     <Layout>
-      <div className="container mx-auto px-4 py-6 space-y-6">
-        {/* Header */}
-        <div className="flex items-center space-x-3">
+      <div className="container mx-auto px-4 py-6">
+        <div className="max-w-4xl mx-auto space-y-6">
+          {/* Header */}
+          <div className="flex items-center space-x-3">
           <Button
             variant="ghost"
             size="icon"
@@ -238,8 +241,8 @@ const ActivityDetails: React.FC = () => {
           </div>
         </div>
 
-        {/* Main Activity Card */}
-        <Card className="bg-card border-border">
+          {/* Main Activity Card */}
+          <Card className="bg-card border-border">
           <CardHeader>
             <div className="flex items-start justify-between">
               <div className="space-y-1">
@@ -887,7 +890,7 @@ const ActivityDetails: React.FC = () => {
                           <p>• This question will be used for PIN recovery if you forget your admin PIN</p>
                           <p>• Keep your security answer confidential and memorable</p>
                         </div>
-                      )}
+                       )}
                     </div>
                   </div>
                 )}
@@ -895,6 +898,7 @@ const ActivityDetails: React.FC = () => {
              )}
            </CardContent>
          </Card>
+        </div>
       </div>
     </Layout>
   );

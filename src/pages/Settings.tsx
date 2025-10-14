@@ -241,9 +241,10 @@ const Settings: React.FC = () => {
 
   return (
     <Layout>
-      <div className="container mx-auto px-4 py-6 space-y-6">
-        {/* Header */}
-        <div className="flex items-center space-x-3">
+      <div className="container mx-auto px-4 py-6">
+        <div className="max-w-4xl mx-auto space-y-6">
+          {/* Header */}
+          <div className="flex items-center space-x-3">
           <div className="w-10 h-10 bg-primary/20 rounded-lg flex items-center justify-center">
             <SettingsIcon className="w-6 h-6 text-primary" />
           </div>
@@ -253,8 +254,8 @@ const Settings: React.FC = () => {
           </div>
         </div>
 
-        {/* Account Section */}
-        <Card className="bg-card border-border">
+          {/* Account Section */}
+          <Card className="bg-card border-border">
           <CardHeader>
             <CardTitle className="flex items-center space-x-2">
               <User className="w-5 h-5 text-primary" />
@@ -305,8 +306,8 @@ const Settings: React.FC = () => {
           </CardContent>
         </Card>
 
-        {/* App Settings */}
-        <Card className="bg-card border-border">
+          {/* App Settings */}
+          <Card className="bg-card border-border">
           <CardHeader>
             <CardTitle className="text-foreground">App Settings</CardTitle>
           </CardHeader>
@@ -375,9 +376,9 @@ const Settings: React.FC = () => {
           </CardContent>
         </Card>
 
-        {/* Admin Section */}
-        {user && (
-          <Card className="bg-card border-border">
+          {/* Admin Section */}
+          {user && (
+            <Card className="bg-card border-border">
             <CardHeader>
               <CardTitle className="flex items-center space-x-2">
                 <SettingsIcon className="w-5 h-5 text-primary" />
@@ -748,7 +749,7 @@ const Settings: React.FC = () => {
           open={showClearDataDialog}
           onOpenChange={setShowClearDataDialog}
         />
-
+        </div>
       </div>
     </Layout>
   );
