@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { ShoppingBag, Package, History, Plus, Settings } from 'lucide-react';
+import { ShoppingBag, Package, History, Plus, Settings, RefreshCw } from 'lucide-react';
 import { useLocation, Link } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { useCart } from '@/contexts/CartContext';
 import { useAuth } from '@/contexts/SupabaseAuthContext';
+import { useProducts } from '@/contexts/SupabaseProductContext';
+import { useStore } from '@/contexts/StoreContext';
 import AppWalkthrough from '@/components/AppWalkthrough';
 
 interface LayoutProps {
@@ -14,6 +16,8 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   const location = useLocation();
   const { activeCart } = useCart();
   const { user } = useAuth();
+  const { activeStore } = useStore();
+  const { isSyncing } = useProducts();
   const [showWalkthrough, setShowWalkthrough] = useState(false);
 
   // Check if user should see walkthrough on first visit
@@ -65,31 +69,36 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   return (
     <div className="min-h-screen bg-background">
       {/* App Walkthrough */}
-      <AppWalkthrough 
-        open={showWalkthrough} 
-        onOpenChange={setShowWalkthrough} 
+      <AppWalkthrough
+        open={showWalkthrough}
+        onOpenChange={setShowWalkthrough}
       />
-      
+
       {/* Header */}
       <header className="sticky top-0 z-50 bg-card/95 backdrop-blur-sm border-b border-border">
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-3">
               <div className="w-8 h-8 rounded-lg overflow-hidden">
-                <img 
-                  src="/lovable-uploads/ccafe85b-c445-42c7-994a-87b65284b41b.png" 
-                  alt="Quik Shopping" 
+                <img
+                  src="/lovable-uploads/ccafe85b-c445-42c7-994a-87b65284b41b.png"
+                  alt="Quik Shopping"
                   className="w-full h-full object-cover"
                 />
               </div>
-            <div>
-              <h1 className="text-xl font-bold text-foreground">Quik Shopping</h1>
-              <p className="text-sm text-muted-foreground">
-                {user ? `Welcome, ${user.user_metadata?.display_name || user.email}` : 'Demo Mode'}
-              </p>
+              <div>
+                <h1 className="text-xl font-bold text-foreground flex items-center gap-2">
+                  Quik Shopping
+                  {isSyncing && (
+                    <RefreshCw className="w-3 h-3 text-primary animate-spin" />
+                  )}
+                </h1>
+                <p className="text-sm text-muted-foreground">
+                  {activeStore ? activeStore.store_name : (user ? `Welcome, ${user.user_metadata?.full_name || user.user_metadata?.display_name || user.email}` : 'Demo Mode')}
+                </p>
+              </div>
             </div>
-            </div>
-            
+
             {/* Cart Total Badge */}
             {activeCart && activeCart.total > 0 && (
               <div className="bg-primary/10 border border-primary/20 px-3 py-1 rounded-full">

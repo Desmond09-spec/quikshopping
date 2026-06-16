@@ -1,0 +1,74 @@
+    setTimeout(() => {
+      setAuthenticatedState(prev => ({ ...prev, isSyncing: false }));
+    }, 1000);
+
+    setAuthenticatedState(prev => {
+      let updatedActivities = [...prev.activityLogs];
+
+      if (eventType === 'INSERT') {
+        const newActivity = {
+          id: newRecord.id,
+          type: newRecord.type,
+          description: newRecord.description,
+          details: newRecord.details,
+          timestamp: new Date(newRecord.created_at)
+        };
+        updatedActivities.unshift(newActivity); // Add to beginning
+      } else if (eventType === 'DELETE') {
+        updatedActivities = updatedActivities.filter(a => a.id !== oldRecord.id);
+      }
+
+      return {
+        ...prev,
+        activityLogs: updatedActivities
+      };
+    });
+  };
+
+  // Reset and initialize state when user changes (account switching)
+  useEffect(() => {
+    if (user && !authLoading) {
+      // Reset authenticated state when switching accounts
+      setAuthenticatedState({
+        products: [],
+        categories: [],
+        transactions: [],
+        activityLogs: [],
+        loading: true,
+        categoriesLoading: true,
+        productsLoading: false,
+        isSyncing: false
+      });
+
+      // Load categories first, then products (which depend on categories)
+      // This prevents products from getting 'Uncategorized' due to race condition
+      loadCategories().then(() => {
+        // Only load products after categories are ready
+        return Promise.all([
+          loadProducts(),      // Products now have correct categories
+          loadTransactions(), // Always load transaction history
+          loadActivities()    // Always load activity history
+        ]);
+      }).catch(console.error);
+    } else if (!user && !authLoading) {
+      // User logged out - ensure authenticated state is cleared
+      setAuthenticatedState({
+        products: [],
+        categories: [],
+        transactions: [],
+        activityLogs: [],
+        loading: false,
+        categoriesLoading: false,
+        productsLoading: false,
+        isSyncing: false
+      });
+    }
+  }, [user, authLoading, activeStore?.id]);
+
+  // Load only categories initially
+  const loadCategories = async () => {
+    if (!user || !activeStore?.id) return;
+
+    setAuthenticatedState(prev => ({ ...prev, categoriesLoading: true }));
+
+    try {

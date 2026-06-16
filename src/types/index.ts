@@ -13,6 +13,7 @@ export interface Product {
   category: string;
   imageUrl?: string;
   description?: string;
+  barcode?: string;
   createdAt?: Date;
   updatedAt?: Date;
 }
@@ -65,7 +66,7 @@ export interface TransactionFormData {
 export const PRODUCT_CATEGORIES = [
   'All',
   'Drinks',
-  'Groceries', 
+  'Groceries',
   'Essentials',
   'Snacks',
   'Personal Care',

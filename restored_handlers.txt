@@ -1,0 +1,121 @@
+  const handleRealtimeProductUpdate = (payload: any) => {
+    const { eventType, new: newRecord, old: oldRecord } = payload;
+
+    // Show syncing indicator
+    setAuthenticatedState(prev => ({ ...prev, isSyncing: true }));
+
+    // Hide after delay
+    setTimeout(() => {
+      setAuthenticatedState(prev => ({ ...prev, isSyncing: false }));
+    }, 1000);
+
+    setAuthenticatedState(prev => {
+      let updatedProducts = [...prev.products];
+
+      if (eventType === 'INSERT') {
+        const categoryName = prev.categories.find(c => c.id === newRecord.category_id)?.name || 'Uncategorized';
+        const newProduct: Product = {
+          id: newRecord.id,
+          name: newRecord.name,
+          price: Number(newRecord.price),
+          quantity: newRecord.quantity,
+          category: categoryName,
+          imageUrl: newRecord.image_url || '',
+          description: newRecord.description || '',
+          barcode: newRecord.barcode || ''
+        };
+        updatedProducts.push(newProduct);
+        updatedProducts.sort((a, b) => a.name.localeCompare(b.name));
+      } else if (eventType === 'UPDATE') {
+        const index = updatedProducts.findIndex(p => p.id === newRecord.id);
+        if (index !== -1) {
+          const categoryName = prev.categories.find(c => c.id === newRecord.category_id)?.name || 'Uncategorized';
+          updatedProducts[index] = {
+            ...updatedProducts[index],
+            name: newRecord.name,
+            price: Number(newRecord.price),
+            quantity: newRecord.quantity,
+            category: categoryName,
+            imageUrl: newRecord.image_url || '',
+            description: newRecord.description || '',
+            barcode: newRecord.barcode || ''
+          };
+        }
+      } else if (eventType === 'DELETE') {
+        updatedProducts = updatedProducts.filter(p => p.id !== oldRecord.id);
+      }
+
+      return {
+        ...prev,
+        products: updatedProducts
+      };
+    });
+  };
+
+  const handleRealtimeTransactionUpdate = (payload: any) => {
+    const { eventType, new: newRecord, old: oldRecord } = payload;
+
+    // Show syncing indicator
+    setAuthenticatedState(prev => ({ ...prev, isSyncing: true }));
+
+    setTimeout(() => {
+      setAuthenticatedState(prev => ({ ...prev, isSyncing: false }));
+    }, 1000);
+
+    setAuthenticatedState(prev => {
+      let updatedTransactions = [...prev.transactions];
+
+      if (eventType === 'INSERT') {
+        const newTransaction = {
+          id: newRecord.id,
+          items: newRecord.items,
+          total: Number(newRecord.total),
+          paymentMethod: newRecord.payment_method,
+          cashierName: newRecord.cashier_name,
+          customer: newRecord.customer,
+          timestamp: new Date(newRecord.created_at)
+        };
+        updatedTransactions.unshift(newTransaction); // Add to beginning
+      } else if (eventType === 'DELETE') {
+        updatedTransactions = updatedTransactions.filter(t => t.id !== oldRecord.id);
+      }
+
+      return {
+        ...prev,
+        transactions: updatedTransactions
+      };
+    });
+  };
+
+  const handleRealtimeActivityUpdate = (payload: any) => {
+    const { eventType, new: newRecord, old: oldRecord } = payload;
+
+    // Show syncing indicator
+    setAuthenticatedState(prev => ({ ...prev, isSyncing: true }));
+
+    setTimeout(() => {
+      setAuthenticatedState(prev => ({ ...prev, isSyncing: false }));
+    }, 1000);
+
+    setAuthenticatedState(prev => {
+      let updatedActivities = [...prev.activityLogs];
+
+      if (eventType === 'INSERT') {
+        const newActivity = {
+          id: newRecord.id,
+          type: newRecord.type,
+          description: newRecord.description,
+          metadata: newRecord.metadata,
+          timestamp: new Date(newRecord.created_at)
+        };
+        updatedActivities.unshift(newActivity); // Add to beginning
+      } else if (eventType === 'DELETE') {
+        updatedActivities = updatedActivities.filter(a => a.id !== oldRecord.id);
+      }
+
+      return {
+        ...prev,
+        activityLogs: updatedActivities
+      };
+    });
+  };

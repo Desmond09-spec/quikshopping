@@ -2,20 +2,19 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, Save, Package, ImageIcon, Upload, X, Lock } from 'lucide-react';
 import { useProducts } from '@/contexts/SupabaseProductContext';
-import { useAdmin } from '@/contexts/AdminContext';
+import { useStore } from '@/contexts/StoreContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import Layout from '@/components/Layout';
-import EnhancedCashierDialog from '@/components/EnhancedCashierDialog';
 
 const EditProduct: React.FC = () => {
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
   const { products, categories, updateProduct } = useProducts();
-  const { isAdminMode, adminSettings } = useAdmin();
+  const { hasPermission, userRole } = useStore();
   
   const [formData, setFormData] = useState({
     name: '',
@@ -29,7 +28,6 @@ const EditProduct: React.FC = () => {
   const [product, setProduct] = useState(products.find(p => p.id === id));
   const [uploadedImage, setUploadedImage] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [showCashierDialog, setShowCashierDialog] = useState(false);
 
   useEffect(() => {
     const foundProduct = products.find(p => p.id === id);
@@ -47,10 +45,10 @@ const EditProduct: React.FC = () => {
 
   // Check if admin access is required and redirect if not authorized
   useEffect(() => {
-    if (adminSettings?.requireAdminForProductActions && !isAdminMode) {
+    if (!hasPermission('products:write')) {
       navigate('/settings');
     }
-  }, [adminSettings, isAdminMode, navigate]);
+  }, [hasPermission, navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -58,18 +56,6 @@ const EditProduct: React.FC = () => {
       return;
     }
 
-    // If cashier dialog is disabled, update product directly
-    if (adminSettings?.disableCashierDialog) {
-      await handleDirectProductUpdate();
-      return;
-    }
-
-    setShowCashierDialog(true);
-  };
-
-  const handleDirectProductUpdate = async () => {
-    if (!id) return;
-    
     setLoading(true);
     
     try {
@@ -79,31 +65,8 @@ const EditProduct: React.FC = () => {
         quantity: parseInt(formData.quantity),
         category: formData.category,
         imageUrl: formData.imageUrl || undefined
-      }, 'admin'); // Use 'admin' as default cashier name when dialog is disabled
+      }, userRole || 'user');
       
-      navigate('/settings');
-    } catch (error) {
-      console.error('Error updating product:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleCashierConfirm = async (cashierName: string) => {
-    if (!id) return;
-    
-    setLoading(true);
-    
-    try {
-      await updateProduct(id, {
-        name: formData.name,
-        price: parseFloat(formData.price),
-        quantity: parseInt(formData.quantity),
-        category: formData.category,
-        imageUrl: formData.imageUrl || undefined
-      }, cashierName);
-      
-      setShowCashierDialog(false);
       navigate('/settings');
     } catch (error) {
       console.error('Error updating product:', error);
@@ -143,7 +106,7 @@ const EditProduct: React.FC = () => {
   };
 
   // Show access denied if admin is required but user is not admin
-  if (adminSettings?.requireAdminForProductActions && !isAdminMode) {
+  if (!hasPermission('products:write')) {
     return (
       <Layout>
         <div className="container mx-auto px-4 py-6 max-w-2xl text-center">
@@ -384,17 +347,6 @@ const EditProduct: React.FC = () => {
           </CardContent>
         </Card>
 
-        {/* Cashier Dialog - Only show if dialog is not disabled */}
-        {!adminSettings?.disableCashierDialog && (
-          <EnhancedCashierDialog
-            open={showCashierDialog}
-            onOpenChange={setShowCashierDialog}
-            onConfirm={handleCashierConfirm}
-            title="Update Product"
-            description="Please enter the cashier's name to proceed with updating this product."
-            loading={loading}
-          />
-        )}
       </div>
     </Layout>
   );

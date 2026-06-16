@@ -23,7 +23,8 @@ type CartAction =
   | { type: 'CREATE_CART'; payload: Cart }
   | { type: 'SWITCH_CART'; payload: string }
   | { type: 'CLOSE_CART'; payload: string }
-  | { type: 'LOAD_CARTS'; payload: MultiCartState };
+  | { type: 'LOAD_CARTS'; payload: MultiCartState }
+  | { type: 'VALIDATE_CARTS'; payload: Product[] };
 
 const CartContext = createContext<{
   carts: Cart[];
@@ -37,6 +38,8 @@ const CartContext = createContext<{
   createNewCart: (name?: string) => string;
   switchToCart: (cartId: string) => void;
   closeCart: (cartId: string) => void;
+  validateCartItems: (products: Product[]) => { errors: Array<{ productName: string; requested: number; available: number }>; isValid: boolean };
+  validateAndAdjustCarts: (products: Product[]) => { adjusted: boolean; adjustedItems: Array<{ cartName: string; productName: string; oldQuantity: number; newQuantity: number }> };
 } | null>(null);
 
 const STORAGE_KEY = 'quik-shopping-carts';
@@ -79,7 +82,7 @@ const cartReducer = (state: MultiCartState, action: CartAction): MultiCartState 
       const newActiveCartId = state.activeCartId === action.payload
         ? (newCarts.length > 0 ? newCarts[0].id : null)
         : state.activeCartId;
-      
+
       return {
         carts: newCarts,
         activeCartId: newActiveCartId
@@ -90,10 +93,10 @@ const cartReducer = (state: MultiCartState, action: CartAction): MultiCartState 
       const { cartId, product } = action.payload;
       const newCarts = state.carts.map(cart => {
         if (cart.id !== cartId) return cart;
-        
+
         const existingItem = cart.items.find(item => item.productId === product.id);
         let newItems: CartItem[];
-        
+
         if (existingItem) {
           newItems = cart.items.map(item =>
             item.productId === product.id
@@ -111,14 +114,14 @@ const cartReducer = (state: MultiCartState, action: CartAction): MultiCartState 
           };
           newItems = [...cart.items, newItem];
         }
-        
+
         return {
           ...cart,
           items: newItems,
           total: calculateTotal(newItems)
         };
       });
-      
+
       return { ...state, carts: newCarts };
     }
 
@@ -126,7 +129,7 @@ const cartReducer = (state: MultiCartState, action: CartAction): MultiCartState 
       const { cartId, itemId } = action.payload;
       const newCarts = state.carts.map(cart => {
         if (cart.id !== cartId) return cart;
-        
+
         const newItems = cart.items.filter(item => item.id !== itemId);
         return {
           ...cart,
@@ -134,31 +137,31 @@ const cartReducer = (state: MultiCartState, action: CartAction): MultiCartState 
           total: calculateTotal(newItems)
         };
       });
-      
+
       return { ...state, carts: newCarts };
     }
 
     case 'UPDATE_QUANTITY': {
       const { cartId, itemId, quantity } = action.payload;
-      
+
       if (quantity <= 0) {
         return cartReducer(state, { type: 'REMOVE_ITEM', payload: { cartId, itemId } });
       }
-      
+
       const newCarts = state.carts.map(cart => {
         if (cart.id !== cartId) return cart;
-        
+
         const newItems = cart.items.map(item =>
           item.id === itemId ? { ...item, quantity } : item
         );
-        
+
         return {
           ...cart,
           items: newItems,
           total: calculateTotal(newItems)
         };
       });
-      
+
       return { ...state, carts: newCarts };
     }
 
@@ -166,14 +169,42 @@ const cartReducer = (state: MultiCartState, action: CartAction): MultiCartState 
       const cartId = action.payload;
       const newCarts = state.carts.map(cart => {
         if (cart.id !== cartId) return cart;
-        
+
         return {
           ...cart,
           items: [],
           total: 0
         };
       });
-      
+
+      return { ...state, carts: newCarts };
+    }
+
+    case 'VALIDATE_CARTS': {
+      const products = action.payload;
+      const newCarts = state.carts.map(cart => {
+        const newItems = cart.items
+          .map(item => {
+            const product = products.find(p => p.id === item.productId);
+            if (!product || product.quantity === 0) {
+              // Product doesn't exist or is out of stock - remove from cart
+              return null;
+            }
+            if (item.quantity > product.quantity) {
+              // Adjust quantity to match available stock
+              return { ...item, quantity: product.quantity };
+            }
+            return item;
+          })
+          .filter((item): item is CartItem => item !== null);
+
+        return {
+          ...cart,
+          items: newItems,
+          total: calculateTotal(newItems)
+        };
+      });
+
       return { ...state, carts: newCarts };
     }
 
@@ -199,7 +230,7 @@ export const CartProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     } catch (error) {
       console.error('Failed to load carts from localStorage:', error);
     }
-    
+
     // Create initial cart if none exists
     const initialCart: Cart = {
       id: `cart-${Date.now()}`,
@@ -209,7 +240,7 @@ export const CartProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       createdAt: new Date(),
       status: 'active'
     };
-    
+
     return {
       carts: [initialCart],
       activeCartId: initialCart.id
@@ -231,7 +262,7 @@ export const CartProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     if (state.carts.length >= MAX_CARTS) {
       return state.activeCartId || '';
     }
-    
+
     const newCart: Cart = {
       id: `cart-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
       name: name || generateCartName(state.carts),
@@ -240,7 +271,7 @@ export const CartProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       createdAt: new Date(),
       status: 'active'
     };
-    
+
     dispatch({ type: 'CREATE_CART', payload: newCart });
     return newCart.id;
   };
@@ -258,18 +289,18 @@ export const CartProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       createNewCart();
       return false;
     }
-    
+
     const cart = state.carts.find(c => c.id === state.activeCartId);
     if (!cart) return false;
-    
+
     const existingItem = cart.items.find(item => item.productId === product.id);
     const currentQuantityInCart = existingItem?.quantity || 0;
     const limit = maxQuantity || product.quantity;
-    
+
     if (currentQuantityInCart >= limit) {
       return false;
     }
-    
+
     dispatch({ type: 'ADD_ITEM', payload: { cartId: state.activeCartId, product } });
     return true;
   };
@@ -293,6 +324,55 @@ export const CartProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     dispatch({ type: 'CLEAR_CART', payload: state.activeCartId });
   };
 
+  const validateCartItems = (products: Product[]) => {
+    if (!activeCart) return { errors: [], isValid: true };
+
+    const errors = [];
+    for (const item of activeCart.items) {
+      const product = products.find(p => p.id === item.productId);
+      if (!product) {
+        errors.push({ productName: item.name, requested: item.quantity, available: 0 });
+      } else if (item.quantity > product.quantity) {
+        errors.push({
+          productName: item.name,
+          requested: item.quantity,
+          available: product.quantity
+        });
+      }
+    }
+
+    return { errors, isValid: errors.length === 0 };
+  };
+
+  const validateAndAdjustCarts = (products: Product[]) => {
+    const adjustedItems: Array<{ cartName: string; productName: string; oldQuantity: number; newQuantity: number }> = [];
+
+    // Check all carts for items that need adjustment
+    state.carts.forEach(cart => {
+      cart.items.forEach(item => {
+        const product = products.find(p => p.id === item.productId);
+        if (!product || item.quantity > product.quantity) {
+          const newQuantity = product ? product.quantity : 0;
+          if (newQuantity !== item.quantity) {
+            adjustedItems.push({
+              cartName: cart.name,
+              productName: item.name,
+              oldQuantity: item.quantity,
+              newQuantity
+            });
+          }
+        }
+      });
+    });
+
+    // If there are adjustments, apply them
+    if (adjustedItems.length > 0) {
+      dispatch({ type: 'VALIDATE_CARTS', payload: products });
+    }
+
+    return { adjusted: adjustedItems.length > 0, adjustedItems };
+  };
+
   return (
     <CartContext.Provider value={{
       carts: state.carts,
@@ -305,7 +385,9 @@ export const CartProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       clearCart,
       createNewCart,
       switchToCart,
-      closeCart
+      closeCart,
+      validateCartItems,
+      validateAndAdjustCarts
     }}>
       {children}
     </CartContext.Provider>

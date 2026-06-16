@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ShoppingBag, Trash2, Plus, Minus, CreditCard, X, PlusCircle } from 'lucide-react';
+import { ShoppingBag, Trash2, Plus, Minus, CreditCard, X, PlusCircle, Package, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -12,24 +12,65 @@ import { useProducts } from '@/contexts/SupabaseProductContext';
 import { PaymentMethod, TransactionFormData, Transaction } from '@/types';
 import Layout from '@/components/Layout';
 import { cn } from '@/lib/utils';
+import { formatPhoneNumber, validatePhoneNumber } from '@/lib/phoneUtils';
+import PullToRefresh from '@/components/PullToRefresh';
 
 const Cart: React.FC = () => {
   const navigate = useNavigate();
-  const { carts, activeCart, activeCartId, removeItem, updateQuantity, clearCart, createNewCart, switchToCart, closeCart } = useCart();
-  const { addTransaction, updateProductQuantity, products } = useProducts();
+  const { carts, activeCart, activeCartId, removeItem, updateQuantity, clearCart, createNewCart, switchToCart, closeCart, validateAndAdjustCarts, validateCartItems } = useCart();
+  const { addTransaction, updateProductQuantity, products, loadProducts } = useProducts();
   const { toast } = useToast();
   const [showPaymentModal, setShowPaymentModal] = useState(false);
-  const [paymentStep, setPaymentStep] = useState<'method' | 'customer' | 'cashier'>('method');
+  const [paymentStep, setPaymentStep] = useState<'method' | 'customer' | 'order'>('method');
   const [isCompletingSale, setIsCompletingSale] = useState(false);
   const [formData, setFormData] = useState<TransactionFormData>({
     paymentMethod: 'cash',
     cashierName: '',
     customer: undefined
   });
+  const [validationErrors, setValidationErrors] = useState<{
+    customerName?: string;
+    customerPhone?: string;
+  }>({});
+  const [showClearCartDialog, setShowClearCartDialog] = useState(false);
+
+  // Real-time cart validation: Adjust cart quantities when product quantities change
+  useEffect(() => {
+    if (products.length > 0) {
+      const result = validateAndAdjustCarts(products);
+
+      if (result.adjusted && result.adjustedItems.length > 0) {
+        // Show notification for adjusted items
+        const message = result.adjustedItems.map(item =>
+          `${item.productName}: ${item.oldQuantity} → ${item.newQuantity}`
+        ).join('\n');
+
+        toast({
+          title: "🔄 Cart Updated",
+          description: (
+            <div className="space-y-1">
+              <p className="font-semibold">Product quantities adjusted due to stock changes:</p>
+              {result.adjustedItems.map((item, idx) => (
+                <p key={idx} className="text-sm">
+                  • {item.productName}: {item.oldQuantity} → {item.newQuantity}
+                  {item.newQuantity === 0 && " (removed - out of stock)"}
+                </p>
+              ))}
+            </div>
+          ),
+          duration: 5000,
+        });
+      }
+    }
+  }, [products, validateAndAdjustCarts, toast]);
+
+  const handleRefresh = async () => {
+    await loadProducts(true);
+  };
 
   const handleQuantityChange = (itemId: string, newQuantity: number) => {
     if (!activeCart) return;
-    
+
     const cartItem = activeCart.items.find(item => item.id === itemId);
     if (!cartItem) return;
 
@@ -38,7 +79,7 @@ const Cart: React.FC = () => {
     } else {
       const quantityDiff = newQuantity - cartItem.quantity;
       const product = products.find(p => p.id === cartItem.productId);
-      
+
       if (product && quantityDiff > 0 && product.quantity < quantityDiff) {
         toast({
           title: "Insufficient stock",
@@ -47,7 +88,7 @@ const Cart: React.FC = () => {
         });
         return;
       }
-      
+
       updateQuantity(itemId, newQuantity);
     }
   };
@@ -76,21 +117,131 @@ const Cart: React.FC = () => {
 
   const handlePaymentMethodSelect = (method: PaymentMethod) => {
     setFormData(prev => ({ ...prev, paymentMethod: method }));
-    
+
     if (method === 'transfer') {
       setPaymentStep('customer');
     } else {
-      setPaymentStep('cashier');
+      setPaymentStep('order');
+    }
+  };
+
+  const validateCustomerName = (name: string): string | undefined => {
+    if (!name.trim()) return 'Name is required';
+
+    // Check if name contains only alphabetic characters and spaces
+    if (!/^[a-zA-Z\s]+$/.test(name)) {
+      return 'Name should contain only letters and spaces';
+    }
+
+    // Check if name has at least two words
+    const words = name.trim().split(/\s+/);
+    if (words.length < 2) {
+      return 'Please enter your full name (first and last).';
+    }
+
+    return undefined;
+  };
+
+  const validateCustomerPhone = (phone: string): string | undefined => {
+    if (!phone.trim()) return 'Phone number is required';
+
+    if (!validatePhoneNumber(phone)) {
+      return 'Please enter a valid Nigerian phone number';
+    }
+
+    return undefined;
+  };
+
+  const capitalizeWords = (str: string): string => {
+    // Don't trim to preserve spaces while typing
+    return str
+      .split(' ')
+      .map(word => {
+        if (word.length === 0) return '';
+        return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
+      })
+      .join(' ');
+  };
+
+  const handleCustomerNameChange = (value: string) => {
+    // Allow only letters and spaces during typing
+    const filtered = value.replace(/[^a-zA-Z\s]/g, '');
+    const capitalized = capitalizeWords(filtered);
+
+    setFormData(prev => ({
+      ...prev,
+      customer: { ...prev.customer, name: capitalized, phone: prev.customer?.phone || '' }
+    }));
+
+    // Clear error on change
+    if (validationErrors.customerName) {
+      setValidationErrors(prev => ({ ...prev, customerName: undefined }));
+    }
+  };
+
+  const handleCustomerPhoneChange = (value: string) => {
+    setFormData(prev => ({
+      ...prev,
+      customer: { ...prev.customer, name: prev.customer?.name || '', phone: value }
+    }));
+
+    // Clear error on change
+    if (validationErrors.customerPhone) {
+      setValidationErrors(prev => ({ ...prev, customerPhone: undefined }));
     }
   };
 
   const handleCustomerSubmit = () => {
-    setPaymentStep('cashier');
+    const nameError = validateCustomerName(formData.customer?.name || '');
+    const phoneError = validateCustomerPhone(formData.customer?.phone || '');
+
+    if (nameError || phoneError) {
+      setValidationErrors({
+        customerName: nameError,
+        customerPhone: phoneError
+      });
+      return;
+    }
+
+    // Format phone number to +234 format before proceeding
+    let formattedPhone = formData.customer?.phone || '';
+    if (formattedPhone) {
+      formattedPhone = formatPhoneNumber(formattedPhone);
+      setFormData(prev => ({
+        ...prev,
+        customer: { ...prev.customer!, phone: formattedPhone }
+      }));
+    }
+
+    setPaymentStep('order');
   };
 
   const handleFinalSubmit = async () => {
     if (!activeCart || !activeCartId) return;
-    
+
+    // Pre-sale validation: Check if all items are still available
+    const validation = validateCartItems(products);
+    if (!validation.isValid) {
+      // Show detailed error message
+      toast({
+        title: "❌ Cannot Complete Sale",
+        description: (
+          <div className="space-y-2">
+            <p className="font-semibold">The following items are no longer available:</p>
+            {validation.errors.map((error, idx) => (
+              <p key={idx} className="text-sm">
+                • {error.productName}: Requested {error.requested}, Available {error.available}
+              </p>
+            ))}
+            <p className="text-sm font-semibold mt-2">Please adjust your cart and try again.</p>
+          </div>
+        ),
+        variant: "destructive",
+        duration: 8000,
+      });
+      return;
+    }
+
     setIsCompletingSale(true);
     try {
       // Update product quantities based on cart items
@@ -111,10 +262,10 @@ const Cart: React.FC = () => {
       };
 
       await addTransaction(transaction);
-      
+
       // Close the current cart after successful transaction
       closeCart(activeCartId);
-      
+
       // Reset form
       setShowPaymentModal(false);
       setPaymentStep('method');
@@ -141,302 +292,378 @@ const Cart: React.FC = () => {
       cashierName: '',
       customer: undefined
     });
+    setValidationErrors({});
   };
 
-  if (!activeCart || activeCart.items.length === 0) {
-    return (
-      <Layout>
-        <div className="container mx-auto px-4 py-12">
-          <div className="max-w-4xl mx-auto">
-            <div className="text-center">
-            <div className="w-24 h-24 bg-muted/30 rounded-full flex items-center justify-center mx-auto mb-6">
-              <ShoppingBag className="w-12 h-12 text-muted-foreground" />
-            </div>
-            <h2 className="text-2xl font-semibold text-foreground mb-3">Cart is empty</h2>
-            <p className="text-muted-foreground mb-6">Add products to start a new transaction</p>
-            <Button variant="default" onClick={() => navigate("/")}>
-              Browse Products
-            </Button>
-          </div>
-          </div>
-        </div>
-      </Layout>
-    );
-  }
+  const isCartEmpty = !activeCart || activeCart.items.length === 0;
 
   return (
     <Layout>
-      <div className="container mx-auto px-4 py-6">
-        <div className="max-w-4xl mx-auto space-y-6">
-          {/* Cart Tabs */}
-          <div className="bg-card border border-border rounded-xl p-3 overflow-x-auto">
-            <div className="flex items-center gap-2 min-w-max">
-              {carts.map((cart) => (
-                <button
-                  key={cart.id}
-                  onClick={() => switchToCart(cart.id)}
-                  className={cn(
-                    "flex items-center gap-2 px-4 py-2 rounded-lg transition-all min-w-[140px]",
-                    cart.id === activeCartId
-                      ? "bg-gradient-primary text-primary-foreground shadow-md"
-                      : "bg-muted/30 text-foreground hover:bg-muted/50"
-                  )}
-                >
-                  <div className="flex-1 text-left">
-                    <p className="font-medium text-sm truncate">{cart.name}</p>
-                    <p className="text-xs opacity-80">{cart.items.length} items</p>
-                  </div>
-                  {carts.length > 1 && (
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleCloseCart(cart.id);
-                      }}
-                      className="p-1 hover:bg-black/10 rounded transition-colors"
-                    >
-                      <X className="w-3 h-3" />
-                    </button>
-                  )}
-                </button>
-              ))}
-              
-              {carts.length < 10 && (
-                <button
-                  onClick={handleCreateNewCart}
-                  className="flex items-center gap-2 px-4 py-2 rounded-lg bg-muted/30 hover:bg-muted/50 text-foreground transition-all min-w-[120px]"
-                >
-                  <PlusCircle className="w-4 h-4" />
-                  <span className="text-sm font-medium">New Cart</span>
-                </button>
-              )}
-            </div>
-          </div>
+      <PullToRefresh onRefresh={handleRefresh}>
+        <div className="container mx-auto px-3 md:px-4 py-4 md:py-6 pb-[152px] md:pb-6">
+          <div className="max-w-4xl mx-auto space-y-5 md:space-y-6">
+            {/* Cart Tabs - Always Visible */}
+            <div className="bg-card shadow-md border border-border rounded-xl p-3 md:p-4 transition-smooth">
+              <div className="flex items-center gap-2.5 overflow-x-auto scrollbar-hide pb-1">
+                {carts.map((cart) => (
+                  <button
+                    key={cart.id}
+                    onClick={() => switchToCart(cart.id)}
+                    className={cn(
+                      "group flex items-center gap-2.5 px-4 md:px-5 py-3 md:py-3.5 rounded-xl transition-smooth min-w-[140px] md:min-w-[160px] flex-shrink-0 touch-target",
+                      cart.id === activeCartId
+                        ? "bg-primary text-primary-foreground shadow-glow"
+                        : "bg-secondary/50 text-foreground hover:bg-secondary shadow-sm hover:shadow-md"
+                    )}
+                  >
+                    <div className="flex-1 text-left min-w-0">
+                      <p className="font-bold text-sm md:text-base truncate">{cart.name}</p>
+                      <p className="text-xs opacity-75 truncate font-medium">
+                        {cart.items.length} {cart.items.length === 1 ? 'item' : 'items'}
+                      </p>
+                    </div>
 
-          {/* Header */}
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-2xl font-bold text-foreground">{activeCart?.name || 'Shopping Cart'}</h1>
-              <p className="text-muted-foreground">{activeCart?.items.length || 0} items</p>
-            </div>
-            
-            <Button
-              variant="destructive"
-              size="sm"
-              onClick={clearCart}
-              className="hover:scale-105"
-            >
-              <Trash2 className="w-4 h-4" />
-              Clear All
-            </Button>
-          </div>
+                    {carts.length > 1 && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleCloseCart(cart.id);
+                        }}
+                        className="p-1.5 hover:bg-black/10 dark:hover:bg-white/10 rounded-lg transition-smooth touch-target"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </button>
+                ))}
 
-          {/* Cart Items */}
-          <div className="space-y-3">
-          {activeCart?.items.map((item) => (
-            <div
-              key={item.id}
-              className="bg-gradient-card border border-border rounded-xl p-4 transition-smooth hover:shadow-md"
-            >
-              <div className="flex items-center justify-between">
-                <div className="flex-1 min-w-0">
-                  <h3 className="font-semibold text-foreground truncate">{item.name}</h3>
-                  <p className="text-sm text-muted-foreground">{item.category}</p>
-                  <p className="text-lg font-bold text-primary">₦{item.price.toLocaleString()}</p>
+                {carts.length < 10 && (
+                  <button
+                    onClick={handleCreateNewCart}
+                    className="flex items-center gap-2.5 px-4 md:px-5 py-3 md:py-3.5 rounded-xl bg-secondary/30 hover:bg-secondary text-foreground transition-smooth min-w-[130px] md:min-w-[140px] border-2 border-dashed border-border hover:border-primary/30 flex-shrink-0 shadow-sm hover:shadow-md touch-target"
+                  >
+                    <PlusCircle className="w-4 h-4 md:w-4.5 md:h-4.5" />
+                    <span className="text-sm md:text-base font-bold">New Cart</span>
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Empty State */}
+            {isCartEmpty ? (
+              <div className="max-w-xl mx-auto text-center space-y-4 py-8 md:py-12">
+                <div className="w-20 h-20 bg-secondary rounded-full flex items-center justify-center mx-auto">
+                  <ShoppingBag className="w-10 h-10 text-muted-foreground" />
                 </div>
+                <h2 className="text-xl md:text-2xl font-bold text-foreground">Your cart is empty</h2>
+                <p className="text-sm md:text-base text-muted-foreground">
+                  Start adding products to create your first transaction
+                </p>
+                <Button size="lg" onClick={() => navigate("/")} className="mt-4">
+                  <Package className="w-4 h-4 mr-2" />
+                  Browse Products
+                </Button>
+              </div>
+            ) : (
+              <>
 
-                <div className="flex items-center space-x-3">
-                  {/* Quantity Controls */}
-                  <div className="flex items-center space-x-2 bg-muted/30 rounded-lg p-1">
-                    <Button
-                      variant="ghost"
-                      size="icon-sm"
-                      onClick={() => handleQuantityChange(item.id, item.quantity - 1)}
-                    >
-                      <Minus className="w-4 h-4" />
-                    </Button>
-                    
-                    <span className="w-8 text-center font-medium text-foreground">
-                      {item.quantity}
-                    </span>
-                    
-                    <Button
-                      variant="ghost"
-                      size="icon-sm"
-                      onClick={() => handleQuantityChange(item.id, item.quantity + 1)}
-                      disabled={(() => {
-                        const product = products.find(p => p.id === item.productId);
-                        return !product || item.quantity >= product.quantity;
-                      })()}
-                    >
-                      <Plus className="w-4 h-4" />
-                    </Button>
+                {/* Header */}
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h1 className="text-2xl md:text-3xl font-bold text-foreground">
+                      {activeCart?.name || 'Cart'}
+                    </h1>
+                    <p className="text-sm md:text-base text-muted-foreground font-medium mt-0.5">
+                      {activeCart?.items.length || 0} {activeCart?.items.length === 1 ? 'item' : 'items'}
+                    </p>
                   </div>
 
-                  {/* Remove Item */}
+                  {/* Desktop: Clear button with text */}
                   <Button
-                    variant="destructive"
-                    size="icon-sm"
-                    onClick={() => removeItem(item.id)}
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowClearCartDialog(true)}
+                    className="hidden md:flex hover:bg-destructive hover:text-destructive-foreground hover:border-destructive transition-smooth shadow-sm hover:shadow-md"
                   >
                     <Trash2 className="w-4 h-4" />
+                    <span className="ml-2">Clear</span>
                   </Button>
-                </div>
-              </div>
 
-              {/* Item Total */}
-              <div className="mt-3 pt-3 border-t border-border/50">
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-muted-foreground">Subtotal</span>
-                  <span className="font-semibold text-foreground">
-                    ₦{(item.price * item.quantity).toLocaleString()}
-                  </span>
+                  {/* Mobile: Clear + Checkout icons */}
+                  <Dialog open={showPaymentModal} onOpenChange={(open) => {
+                    setShowPaymentModal(open);
+                    if (!open) resetModal();
+                  }}>
+                    <div className="flex md:hidden items-center gap-2">
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        onClick={() => setShowClearCartDialog(true)}
+                        className="h-11 w-11 hover:bg-destructive hover:text-destructive-foreground hover:border-destructive transition-smooth shadow-sm hover:shadow-md touch-target"
+                      >
+                        <Trash2 className="w-5 h-5" />
+                      </Button>
+                      <DialogTrigger asChild>
+                        <Button
+                          size="icon"
+                          className="h-11 w-11 shadow-lg hover:shadow-glow transition-smooth touch-target"
+                        >
+                          <CreditCard className="w-5 h-5" />
+                        </Button>
+                      </DialogTrigger>
+                    </div>
+                  </Dialog>
                 </div>
-              </div>
-            </div>
-          ))}
+
+                {/* Cart Items - Mobile Optimized */}
+                <div className="space-y-4 md:space-y-5">
+                  {activeCart?.items.map((item) => {
+                    const product = products.find(p => p.id === item.productId);
+                    const stockStatus = product ? (
+                      item.quantity >= product.quantity ? 'low' : 'available'
+                    ) : 'unknown';
+
+                    return (
+                      <div
+                        key={item.id}
+                        className="bg-card shadow-md hover:shadow-lg border border-border rounded-xl md:rounded-2xl p-4 md:p-5 transition-smooth"
+                      >
+                        <div className="flex gap-4 md:gap-5">
+                          {/* Product Icon */}
+                          <div className="flex-shrink-0 w-16 h-16 md:w-18 md:h-18 bg-gradient-subtle rounded-xl shadow-sm flex items-center justify-center border border-border">
+                            <Package className="w-8 h-8 md:w-9 md:h-9 text-primary" />
+                          </div>
+
+                          {/* Product Details */}
+                          <div className="flex-1 min-w-0 space-y-3 md:space-y-4">
+                            <div>
+                              <div className="flex items-start justify-between gap-3">
+                                <div className="flex-1 min-w-0">
+                                  <h3 className="font-bold text-base md:text-lg text-foreground truncate leading-tight">
+                                    {item.name}
+                                  </h3>
+                                  <p className="text-xs md:text-sm text-muted-foreground font-medium mt-1">
+                                    {item.category}
+                                  </p>
+                                </div>
+
+                                {stockStatus === 'low' && (
+                                  <span className="text-xs px-2.5 py-1 rounded-lg bg-warning/10 text-warning border border-warning/30 font-semibold whitespace-nowrap shadow-sm">
+                                    Low Stock
+                                  </span>
+                                )}
+                              </div>
+
+                              <p className="text-xl md:text-2xl font-bold text-primary">
+                                ₦{item.price.toLocaleString()}
+                              </p>
+                            </div>
+
+                            {/* Controls */}
+                            <div className="flex items-center justify-between gap-3">
+                              {/* Quantity Controls */}
+                              <div className="flex items-center bg-secondary rounded-xl shadow-sm border border-border">
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => handleQuantityChange(item.id, item.quantity - 1)}
+                                  className="h-10 w-10 md:h-11 md:w-11 rounded-l-xl hover:bg-primary/10 hover:text-primary transition-smooth touch-target"
+                                >
+                                  <Minus className="w-4 h-4 md:w-5 md:h-5" />
+                                </Button>
+
+                                <span className="w-12 md:w-14 text-center font-bold text-base md:text-lg text-foreground">
+                                  {item.quantity}
+                                </span>
+
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => handleQuantityChange(item.id, item.quantity + 1)}
+                                  disabled={(() => {
+                                    const product = products.find(p => p.id === item.productId);
+                                    return !product || item.quantity >= product.quantity;
+                                  })()}
+                                  className="h-10 w-10 md:h-11 md:w-11 rounded-r-xl hover:bg-primary/10 hover:text-primary disabled:opacity-30 transition-smooth touch-target"
+                                >
+                                  <Plus className="w-4 h-4 md:w-5 md:h-5" />
+                                </Button>
+                              </div>
+
+                              {/* Remove Button */}
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => removeItem(item.id)}
+                                className="hover:bg-destructive/10 hover:text-destructive h-10 w-10 md:h-11 md:w-11 rounded-xl transition-smooth shadow-sm hover:shadow-md touch-target"
+                              >
+                                <Trash2 className="w-4 h-4 md:w-5 md:h-5" />
+                              </Button>
+                            </div>
+
+                            {/* Item Subtotal */}
+                            <div className="pt-3 border-t border-border">
+                              <div className="flex justify-between items-center">
+                                <span className="text-sm md:text-base text-muted-foreground font-semibold">Subtotal</span>
+                                <span className="font-bold text-lg md:text-xl text-foreground">
+                                  ₦{(item.price * item.quantity).toLocaleString()}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </>
+            )}
+          </div>
         </div>
+      </PullToRefresh>
 
-          {/* Total Summary */}
-          <div className="bg-gradient-card border border-border rounded-xl p-6 sticky bottom-24">
-          <div className="space-y-3">
-            <div className="flex justify-between items-center text-lg">
-              <span className="font-medium text-foreground">Total Amount</span>
-              <span className="font-bold text-2xl text-primary">
-                ₦{activeCart?.total.toLocaleString() || 0}
-              </span>
-            </div>
-
+      {/* Total Summary - Fixed at Bottom (Outside PullToRefresh for proper positioning) */}
+      {!isCartEmpty && (
+        <div className="fixed md:relative bottom-[60px] md:bottom-auto left-0 right-0 bg-card/98 backdrop-blur-md border-t md:border md:border-border py-5 px-4 md:p-6 z-10 shadow-lg md:shadow-glow md:rounded-2xl">
+          <div className="max-w-4xl mx-auto">
             <Dialog open={showPaymentModal} onOpenChange={(open) => {
               setShowPaymentModal(open);
               if (!open) resetModal();
             }}>
-              <DialogTrigger asChild>
-                <Button variant="premium" size="lg" className="w-full shadow-glow">
-                  <CreditCard className="w-5 h-5" />
-                  Complete Sale
-                </Button>
-              </DialogTrigger>
-              
-              <DialogContent className="sm:max-w-md bg-card border-border">
-                <DialogHeader>
-                  <DialogTitle className="text-foreground">
+              {/* Mobile Layout: Total Amount Only */}
+              <div className="flex md:hidden items-center justify-between gap-4">
+                <div className="flex-1">
+                  <span className="font-bold text-lg text-foreground">Total Amount</span>
+                  <p className="text-sm text-muted-foreground font-medium mt-0.5">
+                    {activeCart?.items.length || 0} items
+                  </p>
+                </div>
+                <span className="font-bold text-3xl text-primary">
+                  ₦{activeCart?.total.toLocaleString() || 0}
+                </span>
+              </div>
+
+              {/* Desktop Layout: Total + Full Button */}
+              <div className="hidden md:block space-y-5">
+                <div className="flex justify-between items-center">
+                  <div>
+                    <span className="font-bold text-xl text-foreground">Total Amount</span>
+                    <p className="text-sm text-muted-foreground font-medium mt-0.5">
+                      {activeCart?.items.length || 0} items
+                    </p>
+                  </div>
+                  <span className="font-bold text-4xl text-primary">
+                    ₦{activeCart?.total.toLocaleString() || 0}
+                  </span>
+                </div>
+
+                <DialogTrigger asChild>
+                  <Button
+                    size="lg"
+                    className="w-full h-16 text-lg font-bold shadow-lg hover:shadow-glow transition-smooth"
+                  >
+                    <CreditCard className="w-6 h-6 mr-2.5" />
+                    Complete Sale
+                  </Button>
+                </DialogTrigger>
+              </div>
+
+              <DialogContent className="sm:max-w-md bg-card border-border shadow-elegant rounded-2xl">
+                <DialogHeader className="pb-2">
+                  <DialogTitle className="text-foreground text-xl md:text-2xl font-bold">
                     {paymentStep === 'method' && 'Payment Method'}
-                    {paymentStep === 'customer' && 'Customer Information'}
-                    {paymentStep === 'cashier' && 'Cashier Information'}
+                    {paymentStep === 'customer' && 'Customer Details'}
+                    {paymentStep === 'order' && 'Order Details'}
                   </DialogTitle>
                 </DialogHeader>
 
                 {/* Payment Method Selection */}
                 {paymentStep === 'method' && (
-                  <div className="space-y-4">
-                    <div className="space-y-3">
-                      <div 
-                        className={`flex items-center space-x-3 p-3 border rounded-lg cursor-pointer transition-all ${
-                          formData.paymentMethod === 'cash' 
-                            ? 'border-primary bg-primary/10' 
-                            : 'border-border hover:bg-muted/50'
-                        }`}
-                        onClick={() => handlePaymentMethodSelect('cash')}
+                  <div className="space-y-3 md:space-y-4">
+                    {[
+                      { value: 'cash', label: 'Cash', desc: 'Physical cash payment' },
+                      { value: 'pos', label: 'POS', desc: 'Card payment via terminal' },
+                      { value: 'transfer', label: 'Transfer', desc: 'Bank transfer' }
+                    ].map((method) => (
+                      <button
+                        key={method.value}
+                        className={cn(
+                          "w-full flex items-center gap-3.5 p-4 md:p-5 border rounded-xl cursor-pointer transition-smooth touch-target",
+                          formData.paymentMethod === method.value
+                            ? 'border-primary bg-primary/5 shadow-md'
+                            : 'border-border hover:border-primary/30 hover:bg-secondary/30 shadow-sm hover:shadow-md'
+                        )}
+                        onClick={() => handlePaymentMethodSelect(method.value as PaymentMethod)}
                       >
-                        <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
-                          formData.paymentMethod === 'cash' 
-                            ? 'border-primary bg-primary' 
+                        <div className={cn(
+                          "w-5 h-5 md:w-6 md:h-6 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-smooth",
+                          formData.paymentMethod === method.value
+                            ? 'border-primary bg-primary shadow-sm'
                             : 'border-muted-foreground'
-                        }`}>
-                          {formData.paymentMethod === 'cash' && (
-                            <div className="w-2 h-2 bg-white rounded-full" />
+                        )}>
+                          {formData.paymentMethod === method.value && (
+                            <div className="w-2.5 h-2.5 bg-primary-foreground rounded-full" />
                           )}
                         </div>
-                        <div className="flex-1">
-                          <p className="font-medium text-foreground">Cash</p>
-                          <p className="text-sm text-muted-foreground">Physical cash payment</p>
+                        <div className="flex-1 text-left">
+                          <p className="font-bold text-base md:text-lg text-foreground">{method.label}</p>
+                          <p className="text-sm md:text-base text-muted-foreground font-medium">{method.desc}</p>
                         </div>
-                      </div>
-
-                      <div 
-                        className={`flex items-center space-x-3 p-3 border rounded-lg cursor-pointer transition-all ${
-                          formData.paymentMethod === 'pos' 
-                            ? 'border-primary bg-primary/10' 
-                            : 'border-border hover:bg-muted/50'
-                        }`}
-                        onClick={() => handlePaymentMethodSelect('pos')}
-                      >
-                        <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
-                          formData.paymentMethod === 'pos' 
-                            ? 'border-primary bg-primary' 
-                            : 'border-muted-foreground'
-                        }`}>
-                          {formData.paymentMethod === 'pos' && (
-                            <div className="w-2 h-2 bg-white rounded-full" />
-                          )}
-                        </div>
-                        <div className="flex-1">
-                          <p className="font-medium text-foreground">POS</p>
-                          <p className="text-sm text-muted-foreground">Card payment via POS terminal</p>
-                        </div>
-                      </div>
-
-                      <div 
-                        className={`flex items-center space-x-3 p-3 border rounded-lg cursor-pointer transition-all ${
-                          formData.paymentMethod === 'transfer' 
-                            ? 'border-primary bg-primary/10' 
-                            : 'border-border hover:bg-muted/50'
-                        }`}
-                        onClick={() => handlePaymentMethodSelect('transfer')}
-                      >
-                        <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
-                          formData.paymentMethod === 'transfer' 
-                            ? 'border-primary bg-primary' 
-                            : 'border-muted-foreground'
-                        }`}>
-                          {formData.paymentMethod === 'transfer' && (
-                            <div className="w-2 h-2 bg-white rounded-full" />
-                          )}
-                        </div>
-                        <div className="flex-1">
-                          <p className="font-medium text-foreground">Bank Transfer</p>
-                          <p className="text-sm text-muted-foreground">Mobile/online bank transfer</p>
-                        </div>
-                      </div>
-                    </div>
+                      </button>
+                    ))}
                   </div>
                 )}
 
                 {/* Customer Information */}
                 {paymentStep === 'customer' && (
-                  <div className="space-y-4">
-                    <div>
-                      <Label htmlFor="customerName" className="text-foreground">Customer Name</Label>
+                  <div className="space-y-4 md:space-y-5">
+                    <div className="space-y-2">
+                      <Label htmlFor="customerName" className="text-foreground font-semibold">Customer Name</Label>
                       <Input
                         id="customerName"
                         value={formData.customer?.name || ''}
-                        onChange={(e) => setFormData(prev => ({
-                          ...prev,
-                          customer: { ...prev.customer, name: e.target.value, phone: prev.customer?.phone || '' }
-                        }))}
-                        placeholder="Enter customer name"
-                        className="mt-1"
+                        onChange={(e) => handleCustomerNameChange(e.target.value)}
+                        placeholder="John Doe"
+                        className={cn(
+                          "transition-smooth",
+                          validationErrors.customerName && "border-destructive focus-visible:ring-destructive"
+                        )}
                       />
+                      {validationErrors.customerName && (
+                        <div className="flex items-start gap-2 text-destructive text-sm mt-1.5">
+                          <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                          <span>{validationErrors.customerName}</span>
+                        </div>
+                      )}
                     </div>
 
-                    <div>
-                      <Label htmlFor="customerPhone" className="text-foreground">Phone Number</Label>
+                    <div className="space-y-2">
+                      <Label htmlFor="customerPhone" className="text-foreground font-semibold">Phone Number</Label>
                       <Input
                         id="customerPhone"
                         value={formData.customer?.phone || ''}
-                        onChange={(e) => setFormData(prev => ({
-                          ...prev,
-                          customer: { ...prev.customer, name: prev.customer?.name || '', phone: e.target.value }
-                        }))}
-                        placeholder="080XXXXXXXX"
-                        className="mt-1"
+                        onChange={(e) => handleCustomerPhoneChange(e.target.value)}
+                        placeholder="08012345678"
+                        className={cn(
+                          "transition-smooth",
+                          validationErrors.customerPhone && "border-destructive focus-visible:ring-destructive"
+                        )}
                       />
+                      {validationErrors.customerPhone && (
+                        <div className="flex items-start gap-2 text-destructive text-sm mt-1.5">
+                          <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                          <span>{validationErrors.customerPhone}</span>
+                        </div>
+                      )}
+                      <p className="text-xs text-muted-foreground mt-1.5">
+                        Enter Nigerian phone number (e.g., 08012345678)
+                      </p>
                     </div>
 
-                    <Button 
+                    <Button
                       onClick={handleCustomerSubmit}
-                      className="w-full"
                       disabled={!formData.customer?.name || !formData.customer?.phone}
+                      className="w-full h-12 text-base font-bold shadow-md hover:shadow-glow transition-smooth mt-2"
                     >
                       Continue
                     </Button>
@@ -444,58 +671,52 @@ const Cart: React.FC = () => {
                 )}
 
                 {/* Cashier Information */}
-                {paymentStep === 'cashier' && (
-                  <div className="space-y-4">
-                    <div>
-                      <Label htmlFor="cashierName" className="text-foreground">Cashier Name</Label>
-                      <Input
-                        id="cashierName"
-                        value={formData.cashierName}
-                        onChange={(e) => setFormData(prev => ({ ...prev, cashierName: e.target.value }))}
-                        placeholder="Enter cashier name"
-                        className="mt-1"
-                      />
-                    </div>
-
-                    <div className="bg-muted/30 p-3 rounded-lg">
-                      <h4 className="font-medium text-foreground mb-2">Transaction Summary</h4>
-                      <div className="space-y-1 text-sm">
+                {paymentStep === 'order' && (
+                  <div className="space-y-3 md:space-y-4">
+                    {/* Transaction Summary */}
+                    <div className="bg-secondary/50 rounded-xl p-4 md:p-5 space-y-3 border border-border shadow-sm">
+                      <p className="text-sm md:text-base font-bold text-muted-foreground uppercase">
+                        Summary
+                      </p>
+                      <div className="space-y-2 text-sm md:text-base">
                         <div className="flex justify-between">
-                          <span className="text-muted-foreground">Payment Method:</span>
-                          <span className="text-foreground capitalize">{formData.paymentMethod}</span>
+                          <span className="text-muted-foreground font-semibold">Items</span>
+                          <span className="font-bold text-foreground">{activeCart?.items.length || 0}</span>
                         </div>
                         <div className="flex justify-between">
-                          <span className="text-muted-foreground">Total Amount:</span>
-                          <span className="font-semibold text-primary">₦{activeCart?.total.toLocaleString() || 0}</span>
+                          <span className="text-muted-foreground font-semibold">Payment</span>
+                          <span className="font-bold text-foreground capitalize">{formData.paymentMethod}</span>
                         </div>
                         {formData.customer && (
-                          <>
-                            <div className="flex justify-between">
-                              <span className="text-muted-foreground">Customer:</span>
-                              <span className="text-foreground">{formData.customer.name}</span>
-                            </div>
-                            <div className="flex justify-between">
-                              <span className="text-muted-foreground">Phone:</span>
-                              <span className="text-foreground">{formData.customer.phone}</span>
-                            </div>
-                          </>
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground font-semibold">Customer</span>
+                            <span className="font-bold text-foreground truncate ml-2">{formData.customer.name}</span>
+                          </div>
                         )}
+                        <div className="pt-3 border-t border-border flex justify-between items-center">
+                          <span className="font-bold text-base md:text-lg text-foreground">Total</span>
+                          <span className="font-bold text-xl md:text-2xl text-primary">
+                            ₦{activeCart?.total.toLocaleString() || 0}
+                          </span>
+                        </div>
                       </div>
                     </div>
 
-                    <Button 
+                    <Button
                       onClick={handleFinalSubmit}
-                      variant="success"
-                      className="w-full"
-                      disabled={!formData.cashierName || isCompletingSale}
+                      disabled={isCompletingSale}
+                      className="w-full h-12 md:h-14 text-base md:text-lg font-bold shadow-md hover:shadow-glow transition-smooth"
                     >
                       {isCompletingSale ? (
-                        <div className="flex items-center space-x-2">
-                          <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                          <span>Processing...</span>
-                        </div>
+                        <>
+                          <div className="w-5 h-5 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin mr-2.5" />
+                          Processing...
+                        </>
                       ) : (
-                        'Complete Sale'
+                        <>
+                          <CreditCard className="w-5 h-5 md:w-6 md:h-6 mr-2.5" />
+                          Complete Sale
+                        </>
                       )}
                     </Button>
                   </div>
@@ -504,8 +725,45 @@ const Cart: React.FC = () => {
             </Dialog>
           </div>
         </div>
-      </div>
-      </div>
+      )}
+
+      {/* Clear Cart Confirmation Dialog */}
+      <Dialog open={showClearCartDialog} onOpenChange={setShowClearCartDialog}>
+        <DialogContent className="sm:max-w-md bg-card border-border shadow-elegant rounded-2xl">
+          <DialogHeader className="pb-2">
+            <DialogTitle className="text-foreground text-xl md:text-2xl font-bold flex items-center gap-2">
+              <AlertCircle className="w-6 h-6 text-warning" />
+              Clear Cart?
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-5">
+            <p className="text-muted-foreground text-sm md:text-base">
+              Are you sure you want to clear the cart? This action cannot be undone.
+            </p>
+
+            <div className="flex gap-3">
+              <Button
+                variant="outline"
+                onClick={() => setShowClearCartDialog(false)}
+                className="flex-1 h-11 font-semibold transition-smooth shadow-sm hover:shadow-md"
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={() => {
+                  clearCart();
+                  setShowClearCartDialog(false);
+                }}
+                className="flex-1 h-11 font-semibold transition-smooth shadow-md hover:shadow-lg"
+              >
+                Yes, Clear
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </Layout>
   );
 };

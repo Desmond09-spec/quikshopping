@@ -1,12 +1,12 @@
-import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { 
-  Settings as SettingsIcon, 
-  User, 
-  LogOut, 
-  UserPlus, 
-  LogIn, 
-  Package, 
+import React, { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import {
+  Settings as SettingsIcon,
+  User,
+  LogOut,
+  UserPlus,
+  LogIn,
+  Package,
   Trash2,
   Edit3,
   ArrowRight,
@@ -19,65 +19,59 @@ import {
   HelpCircle,
   Phone,
   Shield,
-  X
-} from 'lucide-react';
-import { useAuth } from '@/contexts/SupabaseAuthContext';
-import { useProducts } from '@/contexts/SupabaseProductContext';
-import { useTheme } from '@/contexts/ThemeContext';
-import { useAdmin } from '@/contexts/AdminContext';
-import { useToast } from '@/hooks/use-toast';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Separator } from '@/components/ui/separator';
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
-import Layout from '@/components/Layout';
-import CategoryManager from '@/components/CategoryManager';
-import CashierManagement from '@/components/CashierManagement';
-import EnhancedCashierDialog from '@/components/EnhancedCashierDialog';
-import AdminSetupDialog from '@/components/AdminSetupDialog';
-import AdminSignInDialog from '@/components/AdminSignInDialog';
-import ForgotPinDialog from '@/components/ForgotPinDialog';
-import AppWalkthrough from '@/components/AppWalkthrough';
-import SecurityQuestionDialog from '@/components/SecurityQuestionDialog';
-import SecurityWarning from '@/components/SecurityWarning';
-import ClearDataDialog from '@/components/ClearDataDialog';
-import FAQSection from '@/components/FAQSection';
-
+  X,
+  BarChart3,
+  TrendingUp,
+  DollarSign,
+  AlertTriangle,
+  Lock,
+} from "lucide-react";
+import { useAuth } from "@/contexts/SupabaseAuthContext";
+import { useProducts } from "@/contexts/SupabaseProductContext";
+import { useTheme } from "@/contexts/ThemeContext";
+import { useStore } from "@/contexts/StoreContext";
+import { useToast } from "@/hooks/use-toast";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Separator } from "@/components/ui/separator";
+import { Badge } from "@/components/ui/badge";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import Layout from "@/components/Layout";
+import PullToRefresh from "@/components/PullToRefresh";
+import CategoryManager from "@/components/CategoryManager";
+import TeamManagement from "@/components/TeamManagement";
+import AppWalkthrough from "@/components/AppWalkthrough";
+import FAQSection from "@/components/FAQSection";
 
 interface BeforeInstallPromptEvent extends Event {
   prompt(): Promise<void>;
-  userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }>;
+  userChoice: Promise<{ outcome: "accepted" | "dismissed" }>;
 }
 
 const Settings: React.FC = () => {
   const navigate = useNavigate();
   const { user, logout } = useAuth();
-  const { products, deleteProduct, loading, loadProducts } = useProducts();
+  const { products, deleteProduct, loading, loadProducts, transactions } =
+    useProducts();
   const { theme, toggleTheme } = useTheme();
   const { toast } = useToast();
-  const { 
-    isAdminMode, 
-    adminSettings, 
-    signOutAdmin, 
-    toggleCashierDialogDisabled,
-    toggleAdminProductRequirement,
-    loadAdminSettings,
-    loading: adminLoading 
-  } = useAdmin();
+  const { hasPermission, userRole } = useStore();
+  
   const [deletingProductId, setDeletingProductId] = useState<string | null>(null);
   const [loggingOut, setLoggingOut] = useState(false);
-  const [showCashierDialog, setShowCashierDialog] = useState(false);
-  const [productToDelete, setProductToDelete] = useState<string | null>(null);
-  const [showAdminSetup, setShowAdminSetup] = useState(false);
-  const [showAdminSignIn, setShowAdminSignIn] = useState(false);
-  const [showForgotPin, setShowForgotPin] = useState(false);
   const [showWalkthrough, setShowWalkthrough] = useState(false);
-  const [showSecurityDialog, setShowSecurityDialog] = useState(false);
-  const [showSecurityWarningDialog, setShowSecurityWarningDialog] = useState(false);
-  const [showClearDataDialog, setShowClearDataDialog] = useState(false);
-  const [justSignedInAsAdmin, setJustSignedInAsAdmin] = useState(false);
-  
-  const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
+
+  const [deferredPrompt, setDeferredPrompt] =
+    useState<BeforeInstallPromptEvent | null>(null);
   const [isInstalled, setIsInstalled] = useState(false);
   const [installing, setInstalling] = useState(false);
 
@@ -88,20 +82,14 @@ const Settings: React.FC = () => {
     }
   }, [user, products.length, loading, loadProducts]);
 
-  // Check for security warning after admin sign in
-  useEffect(() => {
-    if (justSignedInAsAdmin && isAdminMode && adminSettings && !adminSettings.hasSecurityQuestion) {
-      setShowSecurityWarningDialog(true);
-      setJustSignedInAsAdmin(false);
-    }
-  }, [justSignedInAsAdmin, isAdminMode, adminSettings]);
-
   // PWA Install functionality
   useEffect(() => {
     // Check if app is already installed
     const checkInstalled = () => {
-      if (window.matchMedia('(display-mode: standalone)').matches || 
-          (window.navigator as any).standalone === true) {
+      if (
+        window.matchMedia("(display-mode: standalone)").matches ||
+        (window.navigator as any).standalone === true
+      ) {
         setIsInstalled(true);
         return true;
       }
@@ -109,20 +97,23 @@ const Settings: React.FC = () => {
     };
 
     const isAlreadyInstalled = checkInstalled();
-    
+
     // If not installed, check if PWA is installable
     if (!isAlreadyInstalled) {
       // Check if beforeinstallprompt has already fired
       const checkForDeferredPrompt = () => {
         // Some browsers may support installation but don't fire beforeinstallprompt immediately
         // We'll show install option if the browser supports it
-        if ('serviceWorker' in navigator && 'BeforeInstallPromptEvent' in window) {
+        if (
+          "serviceWorker" in navigator &&
+          "BeforeInstallPromptEvent" in window
+        ) {
           // Set a timeout to check if prompt is available
           setTimeout(() => {
             if (!deferredPrompt && !isInstalled) {
               // If no prompt after delay, assume installable for PWA-capable browsers
-              const isHttps = window.location.protocol === 'https:';
-              const isLocalhost = window.location.hostname === 'localhost';
+              const isHttps = window.location.protocol === "https:";
+              const isLocalhost = window.location.hostname === "localhost";
               if (isHttps || isLocalhost) {
                 // Create a mock prompt for browsers that support PWA but don't fire the event immediately
                 setDeferredPrompt({} as BeforeInstallPromptEvent);
@@ -131,7 +122,7 @@ const Settings: React.FC = () => {
           }, 2000);
         }
       };
-      
+
       checkForDeferredPrompt();
     }
 
@@ -147,12 +138,15 @@ const Settings: React.FC = () => {
       setDeferredPrompt(null);
     };
 
-    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
-    window.addEventListener('appinstalled', handleAppInstalled);
+    window.addEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
+    window.addEventListener("appinstalled", handleAppInstalled);
 
     return () => {
-      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
-      window.removeEventListener('appinstalled', handleAppInstalled);
+      window.removeEventListener(
+        "beforeinstallprompt",
+        handleBeforeInstallPrompt,
+      );
+      window.removeEventListener("appinstalled", handleAppInstalled);
     };
   }, []);
 
@@ -161,42 +155,20 @@ const Settings: React.FC = () => {
     try {
       await logout();
     } catch (error) {
-      console.error('Logout error:', error);
+      console.error("Logout error:", error);
     } finally {
       setLoggingOut(false);
     }
   };
 
   const handleDeleteProduct = async (productId: string) => {
-    // If cashier dialog is disabled, delete directly
-    if (adminSettings?.disableCashierDialog) {
-      setDeletingProductId(productId);
-      try {
-        await deleteProduct(productId, 'admin'); // Use 'admin' as default cashier name when dialog is disabled
-      } catch (error) {
-        console.error('Delete product error:', error);
-      } finally {
-        setDeletingProductId(null);
-      }
-      return;
-    }
-    
-    setProductToDelete(productId);
-    setShowCashierDialog(true);
-  };
-
-  const handleCashierConfirm = async (cashierName: string) => {
-    if (!productToDelete) return;
-
-    setDeletingProductId(productToDelete);
+    setDeletingProductId(productId);
     try {
-      await deleteProduct(productToDelete, cashierName);
+      await deleteProduct(productId, userRole || "user");
     } catch (error) {
-      console.error('Delete product error:', error);
+      console.error("Delete product error:", error);
     } finally {
       setDeletingProductId(null);
-      setProductToDelete(null);
-      setShowCashierDialog(false);
     }
   };
 
@@ -206,11 +178,11 @@ const Settings: React.FC = () => {
     setInstalling(true);
     try {
       // Check if it's a mock prompt or real prompt
-      if (typeof deferredPrompt.prompt === 'function') {
+      if (typeof deferredPrompt.prompt === "function") {
         await deferredPrompt.prompt();
         const choiceResult = await deferredPrompt.userChoice;
-        
-        if (choiceResult.outcome === 'accepted') {
+
+        if (choiceResult.outcome === "accepted") {
           setIsInstalled(true);
         }
       } else {
@@ -218,16 +190,18 @@ const Settings: React.FC = () => {
         // Show a fallback message or try alternative installation methods
         toast({
           title: "Install App",
-          description: "To install this app, use your browser's menu to 'Add to Home Screen' or 'Install App'.",
+          description:
+            "To install this app, use your browser's menu to 'Add to Home Screen' or 'Install App'.",
         });
       }
-      
+
       setDeferredPrompt(null);
     } catch (error) {
-      console.error('Error installing PWA:', error);
+      console.error("Error installing PWA:", error);
       toast({
         title: "Installation Error",
-        description: "Unable to install the app. Try using your browser's 'Add to Home Screen' option.",
+        description:
+          "Unable to install the app. Try using your browser's 'Add to Home Screen' option.",
         variant: "destructive",
       });
     } finally {
@@ -239,518 +213,422 @@ const Settings: React.FC = () => {
     setShowWalkthrough(true);
   };
 
+  const handleRefresh = async () => {
+    await loadProducts(true);
+  };
+
   return (
     <Layout>
-      <div className="container mx-auto px-4 py-6">
-        <div className="max-w-4xl mx-auto space-y-6">
-          {/* Header */}
-          <div className="flex items-center space-x-3">
-          <div className="w-10 h-10 bg-primary/20 rounded-lg flex items-center justify-center">
-            <SettingsIcon className="w-6 h-6 text-primary" />
-          </div>
-          <div>
-            <h1 className="text-2xl font-bold text-foreground">Settings</h1>
-            <p className="text-muted-foreground">Manage your account and store</p>
-          </div>
-        </div>
+      <PullToRefresh onRefresh={handleRefresh}>
+        <div className="container mx-auto px-4 py-6">
+          <div className="max-w-4xl mx-auto space-y-6">
+            {/* Header */}
+            <div className="flex items-center space-x-3">
+              <div className="w-10 h-10 bg-primary/20 rounded-lg flex items-center justify-center">
+                <SettingsIcon className="w-6 h-6 text-primary" />
+              </div>
+              <div>
+                <h1 className="text-2xl font-bold text-foreground">Settings</h1>
+                <p className="text-muted-foreground">
+                  Manage your account and store
+                </p>
+              </div>
+            </div>
 
-          {/* Account Section */}
-          <Card className="bg-card border-border">
-          <CardHeader>
-            <CardTitle className="flex items-center space-x-2">
-              <User className="w-5 h-5 text-primary" />
-              <span>Account</span>
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {user ? (
-              <div className="space-y-4">
-                <div className="flex items-center justify-between p-3 bg-muted/30 rounded-lg">
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm text-muted-foreground">Signed in as</p>
-                    <p className="font-medium text-foreground truncate">
-                      {user.user_metadata?.display_name || user.email}
-                    </p>
+            {/* Account Section */}
+            <Card className="bg-card border-border">
+              <CardHeader>
+                <CardTitle className="flex items-center space-x-2">
+                  <User className="w-5 h-5 text-primary" />
+                  <span>Account</span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {user ? (
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between p-3 bg-muted/30 rounded-lg">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <p className="font-medium text-foreground truncate text-base">
+                            {user.user_metadata?.full_name || user.user_metadata?.display_name || "QuikShopping User"}
+                          </p>
+                          <Badge variant="secondary" className="h-5 text-[10px] uppercase tracking-wider bg-primary/10 text-primary border-primary/20 hover:bg-primary/20">
+                            {userRole || 'Owner'}
+                          </Badge>
+                        </div>
+                        <p className="text-sm text-muted-foreground mt-0.5 truncate">
+                          {user.email}
+                        </p>
+                      </div>
+                      <div className="w-8 h-8 bg-primary/20 rounded-full flex items-center justify-center flex-shrink-0">
+                        <User className="w-4 h-4 text-primary" />
+                      </div>
+                    </div>
+
+                    <Button
+                      variant="outline"
+                      onClick={handleLogout}
+                      disabled={loggingOut}
+                      className="w-full justify-start"
+                    >
+                      {loggingOut ? (
+                        <div className="w-4 h-4 border-2 border-muted-foreground/30 border-t-muted-foreground rounded-full animate-spin" />
+                      ) : (
+                        <LogOut className="w-4 h-4" />
+                      )}
+                      Sign Out
+                    </Button>
                   </div>
-                  <div className="w-8 h-8 bg-primary/20 rounded-full flex items-center justify-center flex-shrink-0">
-                    <User className="w-4 h-4 text-primary" />
+                ) : (
+                  <div className="space-y-3">
+                    <Button
+                      variant="default"
+                      onClick={() => navigate("/auth")}
+                      className="w-full justify-start"
+                    >
+                      <LogIn className="w-4 h-4" />
+                      Sign In / Sign Up
+                    </Button>
                   </div>
-                </div>
-                
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Store Overview Section */}
+            {user && (
+              <Card className="bg-card border-border">
+                <CardHeader>
+                  <CardTitle className="flex items-center space-x-2">
+                    <BarChart3 className="w-5 h-5 text-primary" />
+                    <span>Store Overview</span>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {/* Summary Cards */}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    {/* Today's Sales */}
+                    <div className="p-4 bg-gradient-to-br from-green-500/10 to-green-500/5 border border-green-500/20 rounded-lg">
+                      <div className="flex items-center space-x-3">
+                        <div className="w-10 h-10 bg-green-500/20 rounded-lg flex items-center justify-center">
+                          <DollarSign className="w-5 h-5 text-green-400" />
+                        </div>
+                        <div>
+                          <p className="text-xs text-muted-foreground">
+                            Today's Sales
+                          </p>
+                          <p className="text-lg font-bold text-foreground">
+                            ₦
+                            {transactions
+                              .filter((t) => {
+                                const today = new Date();
+                                const txDate = new Date(t.timestamp);
+                                return (
+                                  txDate.toDateString() === today.toDateString()
+                                );
+                              })
+                              .reduce((sum, t) => sum + t.total, 0)
+                              .toLocaleString()}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Today's Profit/Loss */}
+                    <div className="p-4 bg-gradient-to-br from-blue-500/10 to-blue-500/5 border border-blue-500/20 rounded-lg">
+                      <div className="flex items-center space-x-3">
+                        <div className="w-10 h-10 bg-blue-500/20 rounded-lg flex items-center justify-center">
+                          <TrendingUp className="w-5 h-5 text-blue-400" />
+                        </div>
+                        <div>
+                          <p className="text-xs text-muted-foreground">
+                            Today's Profit/Loss
+                          </p>
+                          <p className="text-lg font-bold text-foreground">
+                            ₦0
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            Cost tracking required
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Low Stock Products */}
+                    <div className="p-4 bg-gradient-to-br from-red-500/10 to-red-500/5 border border-red-500/20 rounded-lg">
+                      <div className="flex items-center space-x-3">
+                        <div className="w-10 h-10 bg-red-500/20 rounded-lg flex items-center justify-center">
+                          <AlertTriangle className="w-5 h-5 text-red-400" />
+                        </div>
+                        <div>
+                          <p className="text-xs text-muted-foreground">
+                            Low Stock
+                          </p>
+                          <p className="text-lg font-bold text-foreground">
+                            {products.filter((p) => p.quantity <= 10).length}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            Products
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <Separator className="bg-border" />
+
+                  {/* View Reports Button */}
+                  <Button
+                    variant="default"
+                    onClick={() => navigate("/reports")}
+                    className="w-full justify-between"
+                  >
+                    <span className="flex items-center space-x-2">
+                      <BarChart3 className="w-4 h-4" />
+                      <span>View Full Reports</span>
+                    </span>
+                    <ArrowRight className="w-4 h-4" />
+                  </Button>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* App Settings */}
+            <Card className="bg-card border-border">
+              <CardHeader>
+                <CardTitle className="text-foreground">App Settings</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {/* Theme Settings */}
                 <Button
                   variant="outline"
-                  onClick={handleLogout}
-                  disabled={loggingOut}
+                  onClick={toggleTheme}
                   className="w-full justify-start"
                 >
-                  {loggingOut ? (
-                    <div className="w-4 h-4 border-2 border-muted-foreground/30 border-t-muted-foreground rounded-full animate-spin" />
+                  {theme === "dark" ? (
+                    <>
+                      <Sun className="w-4 h-4" />
+                      Switch to Light Mode
+                    </>
                   ) : (
-                    <LogOut className="w-4 h-4" />
+                    <>
+                      <Moon className="w-4 h-4" />
+                      Switch to Dark Mode
+                    </>
                   )}
-                  Sign Out
                 </Button>
-              </div>
-            ) : (
-              <div className="space-y-3">
+
+                {/* Install App */}
+                {!isInstalled && deferredPrompt ? (
+                  <Button
+                    variant="default"
+                    onClick={handleInstallApp}
+                    disabled={installing}
+                    className="w-full justify-start bg-primary/90 hover:bg-primary"
+                  >
+                    {installing ? (
+                      <div className="w-4 h-4 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin" />
+                    ) : (
+                      <Download className="w-4 h-4" />
+                    )}
+                    Install App
+                  </Button>
+                ) : isInstalled ? (
+                  <div className="flex items-center justify-between p-3 bg-primary/10 border border-primary/20 rounded-lg">
+                    <div className="flex items-center space-x-2">
+                      <Smartphone className="w-4 h-4 text-primary" />
+                      <span className="text-sm font-medium text-primary">
+                        App Installed
+                      </span>
+                    </div>
+                    <div className="w-5 h-5 bg-primary/20 rounded-full flex items-center justify-center">
+                      <Download className="w-3 h-3 text-primary" />
+                    </div>
+                  </div>
+                ) : (
+                  <div className="p-3 bg-muted/30 rounded-lg">
+                    <p className="text-sm text-muted-foreground">
+                      Install option will appear when available on your device
+                    </p>
+                  </div>
+                )}
+
+                {/* App Walkthrough */}
                 <Button
-                  variant="default"
-                  onClick={() => navigate('/auth')}
+                  variant="outline"
+                  onClick={handleShowWalkthrough}
                   className="w-full justify-start"
                 >
-                  <LogIn className="w-4 h-4" />
-                  Sign In / Sign Up
+                  <HelpCircle className="w-4 h-4" />
+                  View App Walkthrough
                 </Button>
-              </div>
-            )}
-          </CardContent>
-        </Card>
 
-          {/* App Settings */}
-          <Card className="bg-card border-border">
-          <CardHeader>
-            <CardTitle className="text-foreground">App Settings</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {/* Theme Settings */}
-            <Button
-              variant="outline"
-              onClick={toggleTheme}
-              className="w-full justify-start"
-            >
-              {theme === 'dark' ? (
-                <>
-                  <Sun className="w-4 h-4" />
-                  Switch to Light Mode
-                </>
-              ) : (
-                <>
-                  <Moon className="w-4 h-4" />
-                  Switch to Dark Mode
-                </>
-              )}
-            </Button>
-
-            {/* Install App */}
-            {!isInstalled && deferredPrompt ? (
-              <Button
-                variant="default"
-                onClick={handleInstallApp}
-                disabled={installing}
-                className="w-full justify-start bg-primary/90 hover:bg-primary"
-              >
-                {installing ? (
-                  <div className="w-4 h-4 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin" />
-                ) : (
-                  <Download className="w-4 h-4" />
-                )}
-                Install App
-              </Button>
-            ) : isInstalled ? (
-              <div className="flex items-center justify-between p-3 bg-primary/10 border border-primary/20 rounded-lg">
-                <div className="flex items-center space-x-2">
-                  <Smartphone className="w-4 h-4 text-primary" />
-                  <span className="text-sm font-medium text-primary">App Installed</span>
-                </div>
-                <div className="w-5 h-5 bg-primary/20 rounded-full flex items-center justify-center">
-                  <Download className="w-3 h-3 text-primary" />
-                </div>
-              </div>
-            ) : (
-              <div className="p-3 bg-muted/30 rounded-lg">
-                <p className="text-sm text-muted-foreground">
-                  Install option will appear when available on your device
-                </p>
-              </div>
-            )}
-
-            {/* App Walkthrough */}
-            <Button
-              variant="outline"
-              onClick={handleShowWalkthrough}
-              className="w-full justify-start"
-            >
-              <HelpCircle className="w-4 h-4" />
-              View App Walkthrough
-            </Button>
-          </CardContent>
-        </Card>
-
-          {/* Admin Section */}
-          {user && (
-            <Card className="bg-card border-border">
-            <CardHeader>
-              <CardTitle className="flex items-center space-x-2">
-                <SettingsIcon className="w-5 h-5 text-primary" />
-                <span>Admin Settings</span>
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {!adminSettings ? (
-                <div className="space-y-3">
-                  <p className="text-sm text-muted-foreground">
-                    Set up admin access to manage advanced settings and security features.
-                  </p>
-                  <Button
-                    variant="default"
-                    onClick={() => setShowAdminSetup(true)}
-                    className="w-full justify-start"
-                    disabled={adminLoading}
-                  >
-                    <SettingsIcon className="w-4 h-4" />
-                    Setup Admin Access
-                  </Button>
-                </div>
-              ) : !isAdminMode ? (
-                <div className="space-y-3">
-                  <div className="p-3 bg-muted/30 rounded-lg">
-                    <p className="text-sm text-muted-foreground">Admin Email</p>
-                    <div className="flex items-center space-x-2">
-                      <Mail className="w-4 h-4 text-muted-foreground flex-shrink-0" />
-                      <p className="font-medium text-foreground truncate">
-                        {adminSettings.adminEmail}
-                      </p>
-                    </div>
-                  </div>
-                  <Button
-                    variant="default"
-                    onClick={() => setShowAdminSignIn(true)}
-                    className="w-full justify-start"
-                    disabled={adminLoading}
-                  >
-                    <LogIn className="w-4 h-4" />
-                    Sign In as Admin
-                  </Button>
-                </div>
-              ) : (
-                 <div className="space-y-4">
-                  <div className="p-3 bg-primary/10 border border-primary/20 rounded-lg">
-                    <p className="text-sm text-primary font-medium">
-                      🔐 Admin Mode Active
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      You have administrative privileges
-                    </p>
-                  </div>
-
-                  {/* Security Warning - Show when no security question is set */}
-                  {!adminSettings.hasSecurityQuestion && (
-                    <SecurityWarning 
-                      onSetupSecurity={() => setShowSecurityDialog(true)}
-                      variant="inline"
-                    />
-                  )}
-                  
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-sm font-medium text-foreground">
-                          Disable Cashier Dialog Modal
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          Skip cashier confirmation for bulk product operations
-                        </p>
-                      </div>
-                      <Button
-                        variant={adminSettings.disableCashierDialog ? "default" : "outline"}
-                        size="sm"
-                        onClick={() => toggleCashierDialogDisabled(!adminSettings.disableCashierDialog)}
-                        disabled={adminLoading}
-                      >
-                        {adminSettings.disableCashierDialog ? "Disabled" : "Enabled"}
-                      </Button>
-                    </div>
-                    
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-sm font-medium text-foreground">
-                          Require Admin for Product Actions
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          Require admin sign-in to add, edit, or delete products
-                        </p>
-                      </div>
-                      <Button
-                        variant={adminSettings.requireAdminForProductActions ? "default" : "outline"}
-                        size="sm"
-                        onClick={() => toggleAdminProductRequirement(!adminSettings.requireAdminForProductActions)}
-                        disabled={adminLoading}
-                      >
-                        {adminSettings.requireAdminForProductActions ? "Enabled" : "Disabled"}
-                      </Button>
-                    </div>
-                  </div>
-
-                  <Separator className="bg-border" />
-
-                  {/* Clear Data Section - Admin Only */}
-                  <div className="space-y-3">
-                    <div className="p-3 bg-destructive/10 border border-destructive/20 rounded-lg">
-                      <div className="flex items-start space-x-3">
-                        <Trash2 className="w-5 h-5 text-destructive flex-shrink-0 mt-0.5" />
-                        <div className="space-y-2 flex-1">
-                          <div>
-                            <p className="text-sm font-medium text-destructive">Danger Zone</p>
-                            <p className="text-xs text-muted-foreground">
-                              Permanently delete all your data from QuikShopping
-                            </p>
-                          </div>
-                          <Button
-                            variant="destructive"
-                            size="sm"
-                            onClick={() => setShowClearDataDialog(true)}
-                            className="w-full sm:w-auto"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                            Clear All Data
-                          </Button>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  <Separator className="bg-border" />
-
-                  <div className="space-y-3">
+                <div className="space-y-3 pt-2 border-t border-border">
+                  <p className="text-sm font-medium text-foreground">Legal</p>
+                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                     <Button
                       variant="outline"
-                      onClick={() => setShowSecurityDialog(true)}
+                      onClick={() => navigate("/privacy")}
                       className="w-full justify-start"
-                      disabled={adminLoading}
                     >
-                      <Shield className="w-4 h-4" />
-                      {adminSettings.hasSecurityQuestion ? 'Manage Security Question' : 'Set Security Question'}
+                      Privacy Policy
+                    </Button>
+                    <Button
+                      variant="outline"
+                      onClick={() => navigate("/terms")}
+                      className="w-full justify-start"
+                    >
+                      Terms of Service
                     </Button>
                   </div>
-
-                  <Separator className="bg-border" />
-                  
-                  <Button
-                    variant="outline"
-                    onClick={signOutAdmin}
-                    className="w-full justify-start"
-                  >
-                    <LogOut className="w-4 h-4" />
-                    Sign Out of Admin Mode
-                  </Button>
                 </div>
-              )}
-            </CardContent>
-          </Card>
-        )}
+              </CardContent>
+            </Card>
 
-        {/* Cashier Management */}
-        <CashierManagement />
 
-        {/* Category Management */}
-        <CategoryManager />
+            {/* Team Management */}
+            {user && <TeamManagement />}
 
-        {/* Product Management Section */}
-        <Card className="bg-card border-border">
-          <CardHeader>
-            <CardTitle className="flex items-center space-x-2">
-              <Package className="w-5 h-5 text-primary" />
-              <span>Product Management</span>
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex flex-col space-y-4 md:flex-row md:items-center md:justify-between md:space-y-0">
-              <div>
-                <p className="font-medium text-foreground">Manage Products</p>
-                <p className="text-sm text-muted-foreground">
-                  {products.length} products in inventory
-                </p>
-              </div>
-               <div className="flex flex-col space-y-2 sm:flex-row sm:space-y-0 sm:space-x-2">
-                {!isAdminMode && adminSettings?.requireAdminForProductActions ? (
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
-                    disabled 
-                    className="opacity-50 cursor-not-allowed w-full sm:w-auto justify-center"
-                  >
-                    <SettingsIcon className="w-4 h-4" />
-                    Admin Access Required
-                  </Button>
-                ) : (
+            {/* Category Management */}
+            <CategoryManager />
+
+            {/* Product Management Section */}
+            <Card className="bg-card border-border">
+              <CardHeader>
+                <CardTitle className="flex items-center space-x-2">
+                  <Package className="w-5 h-5 text-primary" />
+                  <span>Product Management</span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex flex-col space-y-4 md:flex-row md:items-center md:justify-between md:space-y-0">
+                  <div>
+                    <p className="font-medium text-foreground">
+                      Manage Products
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      {products.length} products in inventory
+                    </p>
+                  </div>
+                  <div className="flex flex-col space-y-2 sm:flex-row sm:space-y-0 sm:space-x-2">
+                    {!hasPermission('products:write') ? (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        disabled
+                        className="opacity-50 cursor-not-allowed w-full sm:w-auto justify-center"
+                      >
+                        <Lock className="w-4 h-4" />
+                        Read Only
+                      </Button>
+                    ) : (
+                      <>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => navigate("/add-product")}
+                          className="w-full sm:w-auto justify-center"
+                        >
+                          <Package className="w-4 h-4" />
+                          Add Product
+                        </Button>
+
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => navigate("/products-inventory")}
+                          className="w-full sm:w-auto justify-center"
+                        >
+                          <Archive className="w-4 h-4" />
+                          View Inventory
+                        </Button>
+                      </>
+                    )}
+                  </div>
+                </div>
+
+                {products.length > 0 && (
                   <>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => navigate('/add-product')}
-                      className="w-full sm:w-auto justify-center"
-                    >
-                      <Package className="w-4 h-4" />
-                      Add Product
-                    </Button>
-                    
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => navigate('/products-inventory')}
-                      className="w-full sm:w-auto justify-center"
-                    >
-                      <Archive className="w-4 h-4" />
-                      View Inventory
-                    </Button>
+                    <Separator className="bg-border" />
+                    <div className="space-y-3">
+                      <p className="text-sm font-medium text-foreground">
+                        Quick Actions
+                      </p>
+                      <div className="space-y-2 max-h-64 overflow-y-auto">
+                        {products.map((product) => (
+                          <div
+                            key={product.id}
+                            className="flex items-center justify-between p-3 bg-muted/30 rounded-lg"
+                          >
+                            <div className="flex-1 min-w-0">
+                              <p className="font-medium text-foreground truncate">
+                                {product.name}
+                              </p>
+                              <p className="text-sm text-muted-foreground">
+                                ₦{product.price.toLocaleString()} •{" "}
+                                {product.quantity} in stock
+                              </p>
+                            </div>
+
+                            <div className="flex items-center space-x-2">
+                              {!hasPermission('products:write') ? (
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  disabled
+                                  className="opacity-50 cursor-not-allowed"
+                                >
+                                  <Lock className="w-4 h-4" />
+                                </Button>
+                              ) : (
+                                <>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() =>
+                                      navigate(`/edit-product/${product.id}`)
+                                    }
+                                  >
+                                    <Edit3 className="w-4 h-4" />
+                                  </Button>
+
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() =>
+                                      handleDeleteProduct(product.id)
+                                    }
+                                    disabled={deletingProductId === product.id}
+                                    className="text-red-400 hover:text-red-300 hover:bg-red-500/10"
+                                  >
+                                    {deletingProductId === product.id ? (
+                                      <div className="w-4 h-4 border-2 border-red-400/30 border-t-red-400 rounded-full animate-spin" />
+                                    ) : (
+                                      <Trash2 className="w-4 h-4" />
+                                    )}
+                                  </Button>
+                                </>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
                   </>
                 )}
-              </div>
-            </div>
+              </CardContent>
+            </Card>
 
-            {products.length > 0 && (
-              <>
-                <Separator className="bg-border" />
-                <div className="space-y-3">
-                  <p className="text-sm font-medium text-foreground">Quick Actions</p>
-                  <div className="space-y-2 max-h-64 overflow-y-auto">
-                    {products.map((product) => (
-                      <div
-                        key={product.id}
-                        className="flex items-center justify-between p-3 bg-muted/30 rounded-lg"
-                      >
-                        <div className="flex-1 min-w-0">
-                          <p className="font-medium text-foreground truncate">
-                            {product.name}
-                          </p>
-                          <p className="text-sm text-muted-foreground">
-                            ₦{product.price.toLocaleString()} • {product.quantity} in stock
-                          </p>
-                        </div>
-                        
-                        <div className="flex items-center space-x-2">
-                          {!isAdminMode && adminSettings?.requireAdminForProductActions ? (
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              disabled
-                              className="opacity-50 cursor-not-allowed"
-                            >
-                              <SettingsIcon className="w-4 h-4" />
-                            </Button>
-                          ) : (
-                            <>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => navigate(`/edit-product/${product.id}`)}
-                              >
-                                <Edit3 className="w-4 h-4" />
-                              </Button>
-                              
-                               <Button
-                                 variant="ghost"
-                                 size="icon"
-                                 onClick={() => handleDeleteProduct(product.id)}
-                                 disabled={deletingProductId === product.id}
-                                 className="text-red-400 hover:text-red-300 hover:bg-red-500/10"
-                               >
-                                 {deletingProductId === product.id ? (
-                                   <div className="w-4 h-4 border-2 border-red-400/30 border-t-red-400 rounded-full animate-spin" />
-                                 ) : (
-                                   <Trash2 className="w-4 h-4" />
-                                 )}
-                               </Button>
-                            </>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </>
-            )}
-          </CardContent>
-        </Card>
+            {/* FAQ Section */}
+            <FAQSection />
 
-        {/* FAQ Section */}
-        <FAQSection />
-
-        {/* Cashier Dialog - Only show if dialog is not disabled */}
-        {!adminSettings?.disableCashierDialog && (
-          <EnhancedCashierDialog
-            open={showCashierDialog}
-            onOpenChange={setShowCashierDialog}
-            onConfirm={handleCashierConfirm}
-            title="Delete Product"
-            description="Please enter the cashier's name to proceed with deleting this product."
-            loading={!!deletingProductId}
-          />
-        )}
-
-        {/* Admin Dialogs */}
-        <AdminSetupDialog
-          open={showAdminSetup}
-          onOpenChange={setShowAdminSetup}
-        />
-        
-        <AdminSignInDialog
-          open={showAdminSignIn}
-          onOpenChange={setShowAdminSignIn}
-          onForgotPin={() => {
-            setShowAdminSignIn(false);
-            setShowForgotPin(true);
-          }}
-          onSuccessfulSignIn={() => {
-            setJustSignedInAsAdmin(true);
-          }}
-        />
-        
-        <ForgotPinDialog
-          open={showForgotPin}
-          onOpenChange={setShowForgotPin}
-          onBack={() => {
-            setShowForgotPin(false);
-            setShowAdminSignIn(true);
-          }}
-        />
-
-        {/* App Walkthrough */}
-        <AppWalkthrough 
-          open={showWalkthrough} 
-          onOpenChange={setShowWalkthrough} 
-        />
-
-        {/* Security Question Dialog */}
-        <SecurityQuestionDialog
-          open={showSecurityDialog}
-          onOpenChange={setShowSecurityDialog}
-          onSuccess={() => {
-            loadAdminSettings(); // Refresh admin settings after security question is set
-          }}
-        />
-
-        {/* Security Warning Dialog */}
-        <AlertDialog open={showSecurityWarningDialog} onOpenChange={setShowSecurityWarningDialog}>
-          <AlertDialogContent className="bg-card border-border max-w-md mx-auto">
-            <AlertDialogHeader className="relative">
-              <button
-                onClick={() => setShowSecurityWarningDialog(false)}
-                className="absolute right-0 top-0 p-2 rounded-sm opacity-70 hover:opacity-100 transition-opacity"
-              >
-                <X className="h-4 w-4" />
-                <span className="sr-only">Close</span>
-              </button>
-            </AlertDialogHeader>
-            <div className="flex justify-center py-4">
-              <SecurityWarning 
-                onSetupSecurity={() => {
-                  setShowSecurityWarningDialog(false);
-                  setShowSecurityDialog(true);
-                }}
-                variant="dialog"
-              />
-            </div>
-          </AlertDialogContent>
-        </AlertDialog>
-
-        {/* Clear Data Dialog */}
-        <ClearDataDialog
-          open={showClearDataDialog}
-          onOpenChange={setShowClearDataDialog}
-        />
+            {/* App Walkthrough */}
+            <AppWalkthrough
+              open={showWalkthrough}
+              onOpenChange={setShowWalkthrough}
+            />
+          </div>
         </div>
-      </div>
+      </PullToRefresh>
     </Layout>
   );
 };

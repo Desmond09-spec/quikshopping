@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Plus, Package, ImageIcon, Lock } from 'lucide-react';
+import { ArrowLeft, Plus, Package, ImageIcon, Lock, ScanBarcode } from 'lucide-react';
 import { useProducts } from '@/contexts/SupabaseProductContext';
-import { useAdmin } from '@/contexts/AdminContext';
+import { useStore } from '@/contexts/StoreContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -10,27 +10,29 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import Layout from '@/components/Layout';
-import EnhancedCashierDialog from '@/components/EnhancedCashierDialog';
+import BarcodeScanner from '@/components/BarcodeScanner';
 import { cn } from '@/lib/utils';
+import { useToast } from '@/hooks/use-toast';
 
 const AddProduct: React.FC = () => {
   const navigate = useNavigate();
   const { addProduct, categories } = useProducts();
-  const { isAdminMode, adminSettings } = useAdmin();
-  
+  const { hasPermission, userRole } = useStore();
+  const { toast } = useToast();
+
   const [formData, setFormData] = useState({
     name: '',
     price: '',
     quantity: '',
     category: '',
-    description: ''
+    description: '',
+    barcode: ''
   });
-  
+
   const [loading, setLoading] = useState(false);
   const [selectedImage, setSelectedImage] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
-  const [showCashierDialog, setShowCashierDialog] = useState(false);
-
+  const [showScanner, setShowScanner] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -38,23 +40,13 @@ const AddProduct: React.FC = () => {
       return;
     }
 
-    // If cashier dialog is disabled, add product directly
-    if (adminSettings?.disableCashierDialog) {
-      await handleDirectProductAdd();
-      return;
-    }
-
-    setShowCashierDialog(true);
-  };
-
-  const handleDirectProductAdd = async () => {
     setLoading(true);
-    
+
     try {
       // Convert image to base64 if selected
       let imageUrl = undefined;
       if (selectedImage) {
-        imageUrl = await convertToBase64(selectedImage);
+        imageUrl = await compressImage(selectedImage);
       }
 
       await addProduct({
@@ -62,36 +54,10 @@ const AddProduct: React.FC = () => {
         price: parseFloat(formData.price),
         quantity: parseInt(formData.quantity),
         category: formData.category,
-        imageUrl
-      }, 'admin'); // Use 'admin' as default cashier name when dialog is disabled
-      
-      navigate('/');
-    } catch (error) {
-      console.error('Error adding product:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+        imageUrl,
+        barcode: formData.barcode
+      }, userRole || 'user');
 
-  const handleCashierConfirm = async (cashierName: string) => {
-    setLoading(true);
-    
-    try {
-      // Convert image to base64 if selected
-      let imageUrl = undefined;
-      if (selectedImage) {
-        imageUrl = await convertToBase64(selectedImage);
-      }
-
-      await addProduct({
-        name: formData.name,
-        price: parseFloat(formData.price),
-        quantity: parseInt(formData.quantity),
-        category: formData.category,
-        imageUrl
-      }, cashierName);
-      
-      setShowCashierDialog(false);
       navigate('/');
     } catch (error) {
       console.error('Error adding product:', error);
@@ -104,12 +70,41 @@ const AddProduct: React.FC = () => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
-  const convertToBase64 = (file: File): Promise<string> => {
+  const compressImage = (file: File): Promise<string> => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
       reader.readAsDataURL(file);
-      reader.onload = () => resolve(reader.result as string);
-      reader.onerror = error => reject(error);
+      reader.onload = (event) => {
+        const img = new Image();
+        img.src = event.target?.result as string;
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          let width = img.width;
+          let height = img.height;
+          const MAX_WIDTH = 800;
+          const MAX_HEIGHT = 800;
+
+          if (width > height) {
+            if (width > MAX_WIDTH) {
+              height *= MAX_WIDTH / width;
+              width = MAX_WIDTH;
+            }
+          } else {
+            if (height > MAX_HEIGHT) {
+              width *= MAX_HEIGHT / height;
+              height = MAX_HEIGHT;
+            }
+          }
+
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          ctx?.drawImage(img, 0, 0, width, height);
+          resolve(canvas.toDataURL('image/jpeg', 0.7));
+        };
+        img.onerror = (error) => reject(error);
+      };
+      reader.onerror = (error) => reject(error);
     });
   };
 
@@ -122,8 +117,18 @@ const AddProduct: React.FC = () => {
     }
   };
 
+  const handleScan = (result: string) => {
+    setFormData(prev => ({ ...prev, barcode: result }));
+    setShowScanner(false);
+
+    toast({
+      title: "Barcode Scanned",
+      description: `Barcode: ${result}`,
+    });
+  };
+
   // Show access denied message if admin is required but user is not admin
-  const showAccessDenied = adminSettings?.requireAdminForProductActions && !isAdminMode;
+  const showAccessDenied = !hasPermission('products:write');
 
   return (
     <Layout>
@@ -184,6 +189,30 @@ const AddProduct: React.FC = () => {
                   required
                   className="bg-background border-border"
                 />
+              </div>
+
+              {/* Barcode */}
+              <div className="space-y-2">
+                <Label htmlFor="barcode" className="text-foreground">Barcode (Optional)</Label>
+                <div className="flex gap-2">
+                  <Input
+                    id="barcode"
+                    type="text"
+                    placeholder="Scan or enter barcode"
+                    value={formData.barcode}
+                    onChange={(e) => handleInputChange('barcode', e.target.value)}
+                    className="bg-background border-border"
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    onClick={() => setShowScanner(true)}
+                    className="flex-shrink-0"
+                  >
+                    <ScanBarcode className="w-5 h-5" />
+                  </Button>
+                </div>
               </div>
 
               {/* Price and Quantity */}
@@ -296,15 +325,11 @@ const AddProduct: React.FC = () => {
           </CardContent>
         </Card>
 
-        {/* Cashier Dialog - Only show if dialog is not disabled */}
-        {!adminSettings?.disableCashierDialog && (
-          <EnhancedCashierDialog
-            open={showCashierDialog}
-            onOpenChange={setShowCashierDialog}
-            onConfirm={handleCashierConfirm}
-            title="Add Product"
-            description="Please enter the cashier's name to proceed with adding this product."
-            loading={loading}
+        {/* Barcode Scanner */}
+        {showScanner && (
+          <BarcodeScanner
+            onScan={handleScan}
+            onClose={() => setShowScanner(false)}
           />
         )}
       </div>

@@ -8,9 +8,10 @@ import { CartProvider } from "@/contexts/CartContext";
 import { AuthProvider } from "@/contexts/SupabaseAuthContext";
 import { ProductProvider } from "@/contexts/SupabaseProductContext";
 import { ThemeProvider } from "@/contexts/ThemeContext";
-import { AdminProvider } from "@/contexts/AdminContext";
+import { StoreProvider } from "@/contexts/StoreContext";
 import { Skeleton } from "@/components/ui/skeleton";
 import ProtectedRoute from "@/components/ProtectedRoute";
+import StoreLockdownOverlay from "@/components/StoreLockdownOverlay";
 
 // Lazy load pages for bundle splitting
 const Home = React.lazy(() => import("./pages/Home"));
@@ -18,11 +19,17 @@ const Cart = React.lazy(() => import("./pages/Cart"));
 const AddProduct = React.lazy(() => import("./pages/AddProduct"));
 const History = React.lazy(() => import("./pages/History"));
 const Settings = React.lazy(() => import("./pages/Settings"));
+const Privacy = React.lazy(() => import("./pages/Privacy"));
+const Terms = React.lazy(() => import("./pages/Terms"));
 const Auth = React.lazy(() => import("./pages/Auth"));
+const AuthCallback = React.lazy(() => import("./pages/AuthCallback"));
+const CreateStore = React.lazy(() => import("./pages/CreateStore"));
 const EditProduct = React.lazy(() => import("./pages/EditProduct"));
 const NotFound = React.lazy(() => import("./pages/NotFound"));
 const ProductsInventory = React.lazy(() => import("./pages/ProductsInventory"));
 const ActivityDetails = React.lazy(() => import("./pages/ActivityDetails"));
+const Reports = React.lazy(() => import("./pages/Reports"));
+const AcceptInvite = React.lazy(() => import("./pages/AcceptInvite"));
 
 // Page loading fallback component
 const PageLoader = () => (
@@ -47,35 +54,61 @@ const App = () => (
   <QueryClientProvider client={queryClient}>
     <ThemeProvider>
       <AuthProvider>
-        <AdminProvider>
-          <ProductProvider>
-            <CartProvider>
-            <TooltipProvider>
-              <Toaster />
-              <Sonner />
-              <BrowserRouter>
-                <Suspense fallback={<PageLoader />}>
-                  <Routes>
-                    <Route path="/" element={<ProtectedRoute><Home /></ProtectedRoute>} />
-                    <Route path="/cart" element={<ProtectedRoute><Cart /></ProtectedRoute>} />
-                    <Route path="/add-product" element={<ProtectedRoute><AddProduct /></ProtectedRoute>} />
-                    <Route path="/history" element={<ProtectedRoute><History /></ProtectedRoute>} />
-                    <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
-                    <Route path="/products-inventory" element={<ProtectedRoute><ProductsInventory /></ProtectedRoute>} />
-                    <Route path="/auth" element={<Auth />} />
-                    <Route path="/signin" element={<Auth />} />
-                    <Route path="/signup" element={<Auth />} />
-                    <Route path="/edit-product/:id" element={<ProtectedRoute><EditProduct /></ProtectedRoute>} />
-                    <Route path="/activity/:activityId" element={<ProtectedRoute><ActivityDetails /></ProtectedRoute>} />
-                    {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-                    <Route path="*" element={<NotFound />} />
-                  </Routes>
-                </Suspense>
-              </BrowserRouter>
-            </TooltipProvider>
-            </CartProvider>
-          </ProductProvider>
-        </AdminProvider>
+        <StoreProvider>
+            <ProductProvider>
+              <CartProvider>
+                <TooltipProvider>
+                  <Toaster />
+                  <Sonner />
+                  <BrowserRouter>
+                    <StoreLockdownOverlay />
+                    <Suspense fallback={<PageLoader />}>
+                      <Routes>
+                        <Route path="/" element={<Home />} />
+                        <Route path="/cart" element={<Cart />} />
+                        <Route path="/add-product" element={<AddProduct />} />
+                        <Route path="/history" element={<History />} />
+                        <Route path="/settings" element={<Settings />} />
+                        <Route path="/privacy" element={<Privacy />} />
+                        <Route path="/terms" element={<Terms />} />
+                        <Route
+                          path="/products-inventory"
+                          element={<ProductsInventory />}
+                        />
+                        <Route path="/auth" element={<Auth />} />
+                        <Route
+                          path="/auth/callback"
+                          element={<AuthCallback />}
+                        />
+                        <Route path="/signin" element={<Auth />} />
+                        <Route path="/signup" element={<Auth />} />
+                        <Route
+                          path="/create-store"
+                          element={
+                            <ProtectedRoute>
+                              <CreateStore />
+                            </ProtectedRoute>
+                          }
+                        />
+                        <Route
+                          path="/edit-product/:id"
+                          element={<EditProduct />}
+                        />
+                        <Route
+                          path="/activity/:activityId"
+                          element={<ActivityDetails />}
+                        />
+                        <Route path="/reports" element={<Reports />} />
+                        <Route path="/accept-invite/:token" element={<AcceptInvite />} />
+                        {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+                        <Route path="*" element={<NotFound />} />
+                      </Routes>
+                    </Suspense>
+                  </BrowserRouter>
+                </TooltipProvider>
+              </CartProvider>
+            </ProductProvider>
+        </StoreProvider>
       </AuthProvider>
     </ThemeProvider>
   </QueryClientProvider>

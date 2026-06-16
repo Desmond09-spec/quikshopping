@@ -1,14 +1,18 @@
 import React from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/SupabaseAuthContext';
+import { useStore } from '@/contexts/StoreContext';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
 }
 
 const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
-  const { isAuthenticatedUser, loading, user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
+  const { activeStore, loading: storeLoading } = useStore();
   const location = useLocation();
+
+  const loading = authLoading || storeLoading;
 
   if (loading) {
     return (
@@ -21,13 +25,18 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
     );
   }
 
-  // If user has completed step 1 (account verification) but not step 2 (cashier auth)
-  // This prevents bypassing the second authentication step
-  if (user && !isAuthenticatedUser) {
+  // Redirect to auth if not signed in
+  if (!user) {
     return <Navigate to="/auth" state={{ from: location }} replace />;
   }
 
-  // Allow demo mode (no user) and fully authenticated users
+  // Allow access to /create-store even without an active store
+  const isCreatingStore = location.pathname === '/create-store';
+
+  // Only require active store for non-create-store pages
+  if (!activeStore && !isCreatingStore) {
+    return <Navigate to="/create-store" state={{ from: location }} replace />;
+  }
 
   return <>{children}</>;
 };

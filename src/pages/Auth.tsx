@@ -1,13 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/SupabaseAuthContext';
-import { useAdmin } from '@/contexts/AdminContext';
+import { useStore } from '@/contexts/StoreContext';
 import Layout from '@/components/Layout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
-import { Eye, EyeOff, ArrowLeft, LogIn, User, Shield } from 'lucide-react';
+import { Eye, EyeOff, ArrowLeft, LogIn } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
 
 const Auth: React.FC = () => {
   const location = useLocation();
@@ -15,32 +16,44 @@ const Auth: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const [step, setStep] = useState<'auth' | 'cashier'>('auth');
   const [formData, setFormData] = useState({
     email: '',
     password: '',
     confirmPassword: '',
-    displayName: '',
-    signInName: ''
+    displayName: ''
   });
 
-  const { signUp, verifyAccount, completeCashierAuth, isAuthenticatedUser, user, logout } = useAuth();
-  const { cashierSignInMode, managedCashiers, cachedCashierNames, addCachedCashierName } = useAdmin();
+  const { signUp, signIn, isAuthenticatedUser } = useAuth();
+  const { stores, loading: storesLoading } = useStore();
   const navigate = useNavigate();
 
-  // Redirect if user is fully authenticated
+  // Redirect logic
   useEffect(() => {
-    if (isAuthenticatedUser) {
-      navigate('/');
+    if (isAuthenticatedUser && !storesLoading) {
+      if (stores.length > 0) {
+        navigate('/');
+      } else {
+        navigate('/create-store');
+      }
     }
-  }, [isAuthenticatedUser, navigate]);
+  }, [isAuthenticatedUser, stores, storesLoading, navigate]);
 
-  // Move to cashier step if account verified but not cashier authenticated
-  useEffect(() => {
-    if (user && !isAuthenticatedUser && step === 'auth') {
-      setStep('cashier');
+  const handleGoogleLogin = async () => {
+    try {
+      setLoading(true);
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: `${window.location.origin}/auth/callback`,
+        },
+      });
+      if (error) throw error;
+    } catch (error) {
+      console.error('Error logging in with Google:', error);
+    } finally {
+      setLoading(false);
     }
-  }, [user, isAuthenticatedUser, step]);
+  };
 
   const handleAuthSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -51,28 +64,10 @@ const Auth: React.FC = () => {
       if (isSignUp) {
         await signUp(formData.email, formData.password, formData.displayName);
       } else {
-        // Always verify account first, then proceed to cashier step
-        await verifyAccount(formData.email, formData.password);
-        setStep('cashier');
+        await signIn(formData.email, formData.password);
       }
     } catch (error) {
       // Error handling is done in the auth context
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleCashierSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!formData.signInName.trim()) return;
-
-    setLoading(true);
-    try {
-      addCachedCashierName(formData.signInName.trim());
-      await completeCashierAuth(formData.signInName.trim());
-      navigate('/');
-    } catch (error) {
-      console.error('Cashier authentication error:', error);
     } finally {
       setLoading(false);
     }
@@ -86,13 +81,7 @@ const Auth: React.FC = () => {
   };
 
   const passwordsMatch = formData.password === formData.confirmPassword;
-  const isFormValid = step === 'auth' 
-    ? formData.email && formData.password && (!isSignUp || (formData.displayName && passwordsMatch))
-    : formData.signInName.trim().length > 0;
-
-  const handleNameTagClick = (name: string) => {
-    setFormData(prev => ({ ...prev, signInName: name }));
-  };
+  const isFormValid = formData.email && formData.password && (!isSignUp || (formData.displayName && passwordsMatch));
 
   return (
     <Layout>
@@ -108,7 +97,7 @@ const Auth: React.FC = () => {
             Back
           </Button>
           <h1 className="text-2xl font-bold">
-            {step === 'cashier' ? 'Select Your Identity' : (isSignUp ? 'Create Account' : 'Sign In')}
+            {isSignUp ? 'Create Account' : 'Sign In'}
           </h1>
         </div>
 
@@ -116,276 +105,163 @@ const Auth: React.FC = () => {
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center space-x-2">
-                {step === 'cashier' ? (
-                  <>
-                    <User className="w-5 h-5 text-primary" />
-                    <span>Step 2: Cashier Identity</span>
-                  </>
-                ) : (
-                  <>
-                    <LogIn className="w-5 h-5 text-primary" />
-                    <span>{isSignUp ? 'Sign Up' : 'Step 1: Account Verification'}</span>
-                  </>
-                )}
+                <LogIn className="w-5 h-5 text-primary" />
+                <span>{isSignUp ? 'Sign Up' : 'Account Verification'}</span>
               </CardTitle>
               <CardDescription>
-                {step === 'cashier' 
-                  ? 'Choose your cashier identity to complete sign in'
-                  : (isSignUp 
-                    ? 'Create a new account to save your products and categories'
-                    : 'Enter your credentials to continue'
-                  )
+                {isSignUp
+                  ? 'Create a new account to save your products and categories'
+                  : 'Enter your credentials to continue'
                 }
               </CardDescription>
-              {cashierSignInMode === 'dropdown' && step === 'cashier' && (
-                <div className="flex items-center space-x-2 p-2 bg-primary/10 border border-primary/20 rounded-lg">
-                  <Shield className="w-4 h-4 text-primary" />
-                  <span className="text-xs font-medium text-primary">Secure Sign-In Mode</span>
-                </div>
-              )}
             </CardHeader>
             <CardContent>
-              {step === 'auth' ? (
-                <>
-                  <form onSubmit={handleAuthSubmit} className="space-y-4">
-                    {isSignUp ? (
-                      <div className="space-y-2">
-                        <Label htmlFor="displayName">Display Name</Label>
-                        <Input
-                          id="displayName"
-                          type="text"
-                          value={formData.displayName}
-                          onChange={(e) => handleInputChange('displayName', e.target.value)}
-                          placeholder="Enter your display name"
-                          required
-                        />
-                      </div>
-                    ) : null}
+              <div className="mb-6">
+                <Button
+                  variant="outline"
+                  className="w-full flex items-center justify-center gap-2 h-11"
+                  onClick={handleGoogleLogin}
+                  disabled={loading}
+                >
+                  <svg className="w-5 h-5" viewBox="0 0 24 24">
+                    <path
+                      d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+                      fill="#4285F4"
+                    />
+                    <path
+                      d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+                      fill="#34A853"
+                    />
+                    <path
+                      d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
+                      fill="#FBBC05"
+                    />
+                    <path
+                      d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
+                      fill="#EA4335"
+                    />
+                  </svg>
+                  Continue with Google
+                </Button>
 
-                    <div className="space-y-2">
-                      <Label htmlFor="email">Email</Label>
-                      <Input
-                        id="email"
-                        type="email"
-                        value={formData.email}
-                        onChange={(e) => handleInputChange('email', e.target.value)}
-                        placeholder="Enter your email"
-                        required
-                      />
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="password">Password</Label>
-                      <div className="relative">
-                        <Input
-                          id="password"
-                          type={showPassword ? 'text' : 'password'}
-                          value={formData.password}
-                          onChange={(e) => handleInputChange('password', e.target.value)}
-                          placeholder="Enter your password"
-                          required
-                        />
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
-                          onClick={() => setShowPassword(!showPassword)}
-                        >
-                          {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                        </Button>
-                      </div>
-                    </div>
-
-                    {isSignUp && (
-                      <div className="space-y-2">
-                        <Label htmlFor="confirmPassword">Confirm Password</Label>
-                        <div className="relative">
-                          <Input
-                            id="confirmPassword"
-                            type={showConfirmPassword ? 'text' : 'password'}
-                            value={formData.confirmPassword}
-                            onChange={(e) => handleInputChange('confirmPassword', e.target.value)}
-                            placeholder="Confirm your password"
-                            required
-                          />
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
-                            onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                          >
-                            {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                          </Button>
-                        </div>
-                        {isSignUp && formData.confirmPassword && !passwordsMatch && (
-                          <p className="text-sm text-destructive">Passwords do not match</p>
-                        )}
-                      </div>
-                    )}
-
-                    <Button
-                      type="submit"
-                      variant="premium"
-                      className="w-full"
-                      disabled={loading || !isFormValid}
-                    >
-                      {loading ? (
-                        <div className="w-4 h-4 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin" />
-                      ) : (
-                        <>
-                          <LogIn className="w-4 h-4" />
-                          {isSignUp ? 'Create Account' : 'Continue'}
-                        </>
-                      )}
-                    </Button>
-                  </form>
-
-                  <div className="mt-6 text-center">
-                    <Button
-                      variant="link"
-                      onClick={() => setIsSignUp(!isSignUp)}
-                      className="text-sm"
-                      disabled={loading}
-                    >
-                      {isSignUp 
-                        ? 'Already have an account? Sign in'
-                        : "Don't have an account? Sign up"
-                      }
-                    </Button>
+                <div className="relative my-6">
+                  <div className="absolute inset-0 flex items-center">
+                    <div className="w-full border-t border-border"></div>
                   </div>
-                </>
-              ) : (
-                <form onSubmit={handleCashierSubmit} className="space-y-4">
-                  {/* Name Tags - Show for both modes if cashiers exist */}
-                  {managedCashiers.length > 0 && (
-                    <div className="space-y-3">
-                      <Label className="text-foreground font-medium">Select your name:</Label>
-                      <div className="grid grid-cols-2 gap-2">
-                        {managedCashiers.map((name, index) => (
-                          <Button
-                            key={index}
-                            type="button"
-                            variant={formData.signInName === name ? "default" : "outline"}
-                            className="justify-center h-12"
-                            onClick={() => handleNameTagClick(name)}
-                          >
-                            <div className="flex items-center space-x-2">
-                              <User className="w-4 h-4" />
-                              <span className="truncate">{name}</span>
-                            </div>
-                          </Button>
-                        ))}
-                      </div>
-                      
-                      {cashierSignInMode === 'freetext' && (
-                        <div className="relative">
-                          <div className="absolute inset-0 flex items-center">
-                            <div className="w-full border-t border-border"></div>
-                          </div>
-                          <div className="relative flex justify-center text-xs uppercase">
-                            <span className="bg-card px-2 text-muted-foreground">Or enter manually</span>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  )}
+                  <div className="relative flex justify-center text-xs uppercase">
+                    <span className="bg-card px-2 text-muted-foreground">Or continue with email</span>
+                  </div>
+                </div>
+              </div>
 
-                  {/* Manual Input - Show in freetext mode or when no managed cashiers */}
-                  {(cashierSignInMode === 'freetext' || managedCashiers.length === 0) && (
-                    <div className="space-y-2">
-                      <Label htmlFor="cashierName" className="text-foreground">
-                        {managedCashiers.length > 0 ? 'Or enter different name:' : 'Enter your name:'}
-                      </Label>
-                      <Input
-                        id="cashierName"
-                        type="text"
-                        placeholder="Enter cashier name"
-                        value={formData.signInName}
-                        onChange={(e) => handleInputChange('signInName', e.target.value)}
-                        required
-                        autoFocus={managedCashiers.length === 0}
-                        className="bg-background border-border"
-                      />
-                    </div>
-                  )}
+              <form onSubmit={handleAuthSubmit} className="space-y-4">
+                {isSignUp ? (
+                  <div className="space-y-2">
+                    <Label htmlFor="displayName">Display Name</Label>
+                    <Input
+                      id="displayName"
+                      type="text"
+                      value={formData.displayName}
+                      onChange={(e) => handleInputChange('displayName', e.target.value)}
+                      placeholder="Enter your display name"
+                      required
+                    />
+                  </div>
+                ) : null}
 
-                  {/* Recent names suggestions - only in freetext mode */}
-                  {cashierSignInMode === 'freetext' && cachedCashierNames.length > 0 && (
-                    <div className="space-y-2">
-                      <p className="text-xs text-muted-foreground font-medium">Recent names:</p>
-                      <div className="flex flex-wrap gap-2">
-                        {cachedCashierNames.map((name, index) => (
-                          <Button
-                            key={index}
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            className="h-auto py-1 px-2 text-xs"
-                            onClick={() => handleNameTagClick(name)}
-                          >
-                            {name}
-                          </Button>
-                        ))}
-                      </div>
-                    </div>
-                  )}
+                <div className="space-y-2">
+                  <Label htmlFor="email">Email</Label>
+                  <Input
+                    id="email"
+                    type="email"
+                    value={formData.email}
+                    onChange={(e) => handleInputChange('email', e.target.value)}
+                    placeholder="Enter your email"
+                    required
+                  />
+                </div>
 
-                  {/* Warning for dropdown mode with no cashiers */}
-                  {cashierSignInMode === 'dropdown' && managedCashiers.length === 0 && (
-                    <div className="p-3 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded-lg">
-                      <p className="text-sm text-amber-800 dark:text-amber-200">
-                        ⚠️ No approved cashiers configured. Contact admin to add cashiers or switch to free text mode.
-                      </p>
-                    </div>
-                  )}
-
-                  <Button
-                    type="submit"
-                    variant="premium"
-                    disabled={loading || !formData.signInName.trim() || (cashierSignInMode === 'dropdown' && managedCashiers.length === 0)}
-                    className="w-full mt-6"
-                  >
-                    {loading ? (
-                      <div className="w-4 h-4 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin" />
-                    ) : (
-                      <>
-                        <User className="w-4 h-4" />
-                        Complete Sign In
-                      </>
-                    )}
-                  </Button>
-
-                  <div className="text-center mt-4">
+                <div className="space-y-2">
+                  <Label htmlFor="password">Password</Label>
+                  <div className="relative">
+                    <Input
+                      id="password"
+                      type={showPassword ? 'text' : 'password'}
+                      value={formData.password}
+                      onChange={(e) => handleInputChange('password', e.target.value)}
+                      placeholder="Enter your password"
+                      required
+                    />
                     <Button
                       type="button"
-                      variant="link"
-                      onClick={async () => {
-                        setLoading(true);
-                        try {
-                          await logout();
-                          setStep('auth');
-                        } catch (error) {
-                          console.error('Error logging out:', error);
-                          setStep('auth');
-                        } finally {
-                          setLoading(false);
-                        }
-                      }}
-                      disabled={loading}
-                      className="text-sm"
+                      variant="ghost"
+                      size="sm"
+                      className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                      onClick={() => setShowPassword(!showPassword)}
                     >
-                      {loading ? (
-                        <div className="w-4 h-4 border-2 border-muted-foreground/30 border-t-muted-foreground rounded-full animate-spin mr-1" />
-                      ) : (
-                        <ArrowLeft className="w-4 h-4 mr-1" />
-                      )}
-                      Back to Account Verification
+                      {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                     </Button>
                   </div>
-                </form>
-              )}
+                </div>
+
+                {isSignUp && (
+                  <div className="space-y-2">
+                    <Label htmlFor="confirmPassword">Confirm Password</Label>
+                    <div className="relative">
+                      <Input
+                        id="confirmPassword"
+                        type={showConfirmPassword ? 'text' : 'password'}
+                        value={formData.confirmPassword}
+                        onChange={(e) => handleInputChange('confirmPassword', e.target.value)}
+                        placeholder="Confirm your password"
+                        required
+                      />
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                        onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                      >
+                        {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </Button>
+                    </div>
+                    {isSignUp && formData.confirmPassword && !passwordsMatch && (
+                      <p className="text-sm text-destructive">Passwords do not match</p>
+                    )}
+                  </div>
+                )}
+
+                <Button
+                  type="submit"
+                  variant="premium"
+                  className="w-full"
+                  disabled={loading || !isFormValid}
+                >
+                  {loading ? (
+                    <div className="w-4 h-4 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin" />
+                  ) : (
+                    <>
+                      <LogIn className="w-4 h-4" />
+                      {isSignUp ? 'Create Account' : 'Continue'}
+                    </>
+                  )}
+                </Button>
+              </form>
+
+              <div className="mt-6 text-center">
+                <Button
+                  variant="link"
+                  onClick={() => setIsSignUp(!isSignUp)}
+                  className="text-sm"
+                  disabled={loading}
+                >
+                  {isSignUp
+                    ? 'Already have an account? Sign in'
+                    : "Don't have an account? Sign up"
+                  }
+                </Button>
+              </div>
             </CardContent>
           </Card>
         </div>

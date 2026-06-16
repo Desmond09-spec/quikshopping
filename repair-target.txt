@@ -1,0 +1,4 @@
+    setTimeout(() => {
+      setAuthenticatedState(prev => ({ ...prev, isSyncing: false }));
+    }, 1000);
+        try {
