@@ -228,8 +228,8 @@ const History: React.FC = () => {
   return (
     <Layout>
       <PullToRefresh onRefresh={handleRefresh}>
-        <div className="container mx-auto px-4 py-6">
-          <div className="max-w-5xl mx-auto space-y-6">
+        <div className="w-full px-4 md:px-6 lg:px-8 py-6">
+          <div className="max-w-7xl mx-auto space-y-6">
             {/* Header */}
             <div className="flex items-center space-x-3">
               <div className="w-10 h-10 bg-green-500/20 rounded-lg flex items-center justify-center">
@@ -242,7 +242,7 @@ const History: React.FC = () => {
             </div>
 
             {/* Summary Cards */}
-            <div className="grid grid-cols-2 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
               <Card className="bg-card border-border">
                 <CardContent className="p-4">
                   <div className="flex items-center space-x-3">

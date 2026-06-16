@@ -71,6 +71,7 @@
     --sidebar-accent-foreground: 240 5.9% 10%;
     --sidebar-border: 220 13% 91%;
     --sidebar-ring: 217.2 91.2% 59.8%;
+    --sidebar-dark: 0 0% 6.7%; /* #111111 */
   }
 
   .dark {
@@ -138,6 +139,7 @@
     --sidebar-accent-foreground: 240 5.9% 10%;
     --sidebar-border: 220 13% 91%;
     --sidebar-ring: 217.2 91.2% 59.8%;
+    --sidebar-dark: 0 0% 6.7%; /* #111111 */
   }
 }
 
@@ -195,6 +197,15 @@
 }
 
 @layer components {
+  /* Sidebar Dark Background */
+  .bg-sidebar-dark {
+    @apply bg-muted;
+  }
+
+  .dark .bg-sidebar-dark {
+    background-color: hsl(var(--sidebar-dark));
+  }
+
   /* Custom gradient backgrounds */
   .bg-gradient-primary {
     background: var(--gradient-primary);

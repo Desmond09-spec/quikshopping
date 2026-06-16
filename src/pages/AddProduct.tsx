@@ -132,9 +132,9 @@ const AddProduct: React.FC = () => {
 
   return (
     <Layout>
-      <div className="container mx-auto px-4 py-6 max-w-2xl">
+      <div className="w-full px-4 md:px-6 lg:px-8 py-6">
         {/* Header */}
-        <div className="flex items-center space-x-4 mb-6">
+        <div className="flex items-center space-x-4 mb-6 max-w-6xl mx-auto">
           <Button
             variant="ghost"
             size="icon"
@@ -151,7 +151,7 @@ const AddProduct: React.FC = () => {
 
         {/* Access Denied Message */}
         {showAccessDenied && (
-          <Card className="bg-card border-border mb-6">
+          <Card className="bg-card border-border mb-6 max-w-6xl mx-auto">
             <CardContent className="pt-6 text-center">
               <div className="w-16 h-16 bg-muted/30 rounded-full flex items-center justify-center mx-auto mb-4">
                 <Lock className="w-8 h-8 text-muted-foreground" />
@@ -167,16 +167,18 @@ const AddProduct: React.FC = () => {
           </Card>
         )}
 
-        {/* Form Card */}
-        <Card className={cn("bg-card border-border", showAccessDenied && "opacity-50 pointer-events-none")}>
-          <CardHeader>
-            <CardTitle className="flex items-center space-x-2">
-              <Package className="w-5 h-5 text-primary" />
-              <span>Product Information</span>
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-6">
+        {/* Two-Column Layout: Form on left, Image upload on right */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 max-w-6xl mx-auto">
+          {/* Left Column: Form Fields */}
+          <Card className={cn("bg-card border-border", showAccessDenied && "opacity-50 pointer-events-none")}>
+            <CardHeader>
+              <CardTitle className="flex items-center space-x-2">
+                <Package className="w-5 h-5 text-primary" />
+                <span>Product Information</span>
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <form onSubmit={handleSubmit} className="space-y-6">
               {/* Product Name */}
               <div className="space-y-2">
                 <Label htmlFor="name" className="text-foreground">Product Name *</Label>
@@ -263,40 +265,8 @@ const AddProduct: React.FC = () => {
                 </Select>
               </div>
 
-              {/* Image Upload */}
-              <div className="space-y-2">
-                <Label htmlFor="image" className="text-foreground flex items-center space-x-2">
-                  <ImageIcon className="w-4 h-4" />
-                  <span>Product Image (optional)</span>
-                </Label>
-                <Input
-                  id="image"
-                  type="file"
-                  accept="image/*"
-                  onChange={handleImageChange}
-                  className="bg-background border-border cursor-pointer"
-                />
-                <p className="text-xs text-muted-foreground">
-                  Upload an image of your product. Supported formats: JPG, PNG, GIF
-                </p>
-              </div>
-
-              {/* Image Preview */}
-              {imagePreview && (
-                <div className="space-y-2">
-                  <Label className="text-foreground">Image Preview</Label>
-                  <div className="aspect-square w-32 rounded-lg overflow-hidden border border-border">
-                    <img
-                      src={imagePreview}
-                      alt="Product preview"
-                      className="w-full h-full object-cover"
-                    />
-                  </div>
-                </div>
-              )}
-
-              {/* Submit Button */}
-              <div className="flex space-x-3 pt-4">
+              {/* Submit Button - Full Width */}
+              <div className="flex space-x-3 pt-4 lg:flex-col-reverse lg:space-x-0 lg:space-y-2">
                 <Button
                   type="button"
                   variant="outline"
@@ -323,7 +293,76 @@ const AddProduct: React.FC = () => {
               </div>
             </form>
           </CardContent>
-        </Card>
+          </Card>
+
+          {/* Right Column: Image Upload (Desktop Only) */}
+          <Card className={cn("bg-card border-border", showAccessDenied && "opacity-50 pointer-events-none")}>
+            <CardHeader>
+              <CardTitle className="flex items-center space-x-2">
+                <ImageIcon className="w-5 h-5 text-primary" />
+                <span>Product Image</span>
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-6">
+                {/* Drag & Drop Image Upload */}
+                <div
+                  className="border-2 border-dashed border-border rounded-xl p-8 text-center hover:border-primary/50 hover:bg-primary/5 transition-smooth cursor-pointer"
+                  onClick={() => document.getElementById('image')?.click()}
+                >
+                  <div className="w-16 h-16 bg-secondary rounded-lg flex items-center justify-center mx-auto mb-4">
+                    <ImageIcon className="w-8 h-8 text-primary" />
+                  </div>
+                  <h3 className="font-semibold text-foreground mb-2">
+                    Drag files here or click
+                  </h3>
+                  <p className="text-sm text-muted-foreground mb-4">
+                    Supported formats: JPG, PNG, GIF
+                  </p>
+                  <Input
+                    id="image"
+                    type="file"
+                    accept="image/*"
+                    onChange={handleImageChange}
+                    className="hidden bg-background border-border cursor-pointer"
+                  />
+                </div>
+
+                {/* Image Preview */}
+                {imagePreview ? (
+                  <div className="space-y-3">
+                    <Label className="text-foreground">Selected Image</Label>
+                    <div className="aspect-square w-full rounded-lg overflow-hidden border border-border shadow-md">
+                      <img
+                        src={imagePreview}
+                        alt="Product preview"
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setImagePreview(null);
+                        setSelectedImage(null);
+                      }}
+                      className="w-full"
+                    >
+                      Remove Image
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="text-center py-4">
+                    <p className="text-sm text-muted-foreground">
+                      No image selected yet
+                    </p>
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
 
         {/* Barcode Scanner */}
         {showScanner && (

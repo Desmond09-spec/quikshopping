@@ -220,8 +220,8 @@ const Settings: React.FC = () => {
   return (
     <Layout>
       <PullToRefresh onRefresh={handleRefresh}>
-        <div className="container mx-auto px-4 py-6">
-          <div className="max-w-4xl mx-auto space-y-6">
+        <div className="w-full px-4 md:px-6 lg:px-8 py-6">
+          <div className="max-w-6xl mx-auto space-y-6">
             {/* Header */}
             <div className="flex items-center space-x-3">
               <div className="w-10 h-10 bg-primary/20 rounded-lg flex items-center justify-center">
@@ -235,8 +235,10 @@ const Settings: React.FC = () => {
               </div>
             </div>
 
-            {/* Account Section */}
-            <Card className="bg-card border-border">
+            {/* Two-Column Layout: Account (left) and Analytics (right) */}
+            <div className="grid grid-cols-1 lg:grid-cols-[300px_1fr] gap-6">
+              {/* Left Column: Account Section */}
+              <Card className="bg-card border-border h-fit lg:sticky lg:top-24">
               <CardHeader>
                 <CardTitle className="flex items-center space-x-2">
                   <User className="w-5 h-5 text-primary" />
@@ -292,17 +294,17 @@ const Settings: React.FC = () => {
                   </div>
                 )}
               </CardContent>
-            </Card>
+              </Card>
 
-            {/* Store Overview Section */}
-            {user && (
-              <Card className="bg-card border-border">
-                <CardHeader>
-                  <CardTitle className="flex items-center space-x-2">
-                    <BarChart3 className="w-5 h-5 text-primary" />
-                    <span>Store Overview</span>
-                  </CardTitle>
-                </CardHeader>
+              {/* Right Column: Store Analytics */}
+              {user && (
+                <Card className="bg-card border-border">
+                  <CardHeader>
+                    <CardTitle className="flex items-center space-x-2">
+                      <BarChart3 className="w-5 h-5 text-primary" />
+                      <span>Store Overview</span>
+                    </CardTitle>
+                  </CardHeader>
                 <CardContent className="space-y-4">
                   {/* Summary Cards */}
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -390,7 +392,8 @@ const Settings: React.FC = () => {
                   </Button>
                 </CardContent>
               </Card>
-            )}
+              )}
+            </div>
 
             {/* App Settings */}
             <Card className="bg-card border-border">

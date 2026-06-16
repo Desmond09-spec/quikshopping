@@ -89,37 +89,43 @@ const Home: React.FC = () => {
   return (
     <Layout>
       <PullToRefresh onRefresh={handleRefresh}>
-        <div className="container mx-auto px-4 py-6 space-y-6">
-          {/* Search Bar */}
-          <SearchBar
-            value={searchQuery}
-            onChange={setSearchQuery}
-            placeholder="Search products..."
-            onScan={() => setShowScanner(true)}
-          />
-
-          {/* Category Filter */}
-          <CategoryFilter
-            selectedCategory={selectedCategory}
-            onCategoryChange={setSelectedCategory}
-          />
-
-          {/* Add Product Button */}
-          <div className="flex justify-between items-center">
-            <div>
-              <h2 className="text-xl font-semibold text-foreground">Products</h2>
-              <p className="text-sm text-muted-foreground">
-                {loading || productsLoading ? 'Loading...' : `${filteredProducts.length} ${filteredProducts.length === 1 ? 'product' : 'products'}`}
-                {!loading && !productsLoading && selectedCategory !== 'All' && ` in ${selectedCategory}`}
-              </p>
+        <div className="w-full px-4 md:px-6 lg:px-8 py-6 space-y-6">
+          {/* Top Controls - Horizontal on Desktop */}
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+            {/* Search Bar - Full width on mobile, flex-grow on desktop */}
+            <div className="flex-1 md:flex-grow">
+              <SearchBar
+                value={searchQuery}
+                onChange={setSearchQuery}
+                placeholder="Search products..."
+                onScan={() => setShowScanner(true)}
+              />
             </div>
 
-            {!hasPermission('products:write') ? (
+            {/* Category Filter - Full width on mobile, inline on desktop */}
+            <div className="md:flex-shrink-0">
+              <CategoryFilter
+                selectedCategory={selectedCategory}
+                onCategoryChange={setSelectedCategory}
+              />
+            </div>
+
+            {/* Add Product Button - Full width on mobile, right-aligned on desktop */}
+            {hasPermission('products:write') && (
+              <Link to="/add-product" className="md:flex-shrink-0">
+                <Button variant="premium" size="sm" className="shadow-glow w-full md:w-auto">
+                  <Plus className="w-4 h-4" />
+                  Add Product
+                </Button>
+              </Link>
+            )}
+            
+            {!hasPermission('products:write') && (
               <Button
                 variant="outline"
                 size="sm"
                 disabled
-                className="opacity-50 cursor-not-allowed"
+                className="opacity-50 cursor-not-allowed md:flex-shrink-0 w-full md:w-auto"
                 onClick={() => toast({
                   title: "Permission Denied",
                   description: "You don't have permission to add products",
@@ -129,14 +135,16 @@ const Home: React.FC = () => {
                 <Lock className="w-4 h-4" />
                 Read Only
               </Button>
-            ) : (
-              <Link to="/add-product">
-                <Button variant="premium" size="sm" className="shadow-glow">
-                  <Plus className="w-4 h-4" />
-                  Add Product
-                </Button>
-              </Link>
             )}
+          </div>
+
+          {/* Product Info Header */}
+          <div>
+            <h2 className="text-xl font-semibold text-foreground">Products</h2>
+            <p className="text-sm text-muted-foreground">
+              {loading || productsLoading ? 'Loading...' : `${filteredProducts.length} ${filteredProducts.length === 1 ? 'product' : 'products'}`}
+              {!loading && !productsLoading && selectedCategory !== 'All' && ` in ${selectedCategory}`}
+            </p>
           </div>
 
           {/* Products Grid */}
@@ -146,7 +154,7 @@ const Home: React.FC = () => {
               <p className="text-muted-foreground">Loading products...</p>
             </div>
           ) : filteredProducts.length > 0 ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
               {filteredProducts.map((product) => (
                 <ProductCard
                   key={product.id}
